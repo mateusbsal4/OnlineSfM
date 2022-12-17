@@ -1,0 +1,3 @@
+/home/mateus/IC/OnlineSfM/video_test/CMakeFiles/rebuild_cache.dir
+/home/mateus/IC/OnlineSfM/video_test/CMakeFiles/edit_cache.dir
+/home/mateus/IC/OnlineSfM/video_test/CMakeFiles/video_test.dir

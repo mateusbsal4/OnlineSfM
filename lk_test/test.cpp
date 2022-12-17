@@ -31,11 +31,13 @@ static void onMouse( int event, int x, int y, int /*flags*/, void* /*param*/ )
 }
 int main( int argc, char** argv )
 {
+
     VideoCapture cap;
     TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS,20,0.03);
     Size subPixWinSize(10,10), winSize(31,31);
     const int MAX_COUNT = 500;
     bool needToInit = false;
+//    bool needToInit = true; 
     bool nightMode = false;
     help();
     cv::CommandLineParser parser(argc, argv, "{@input|0|}");
@@ -56,6 +58,8 @@ int main( int argc, char** argv )
     for(;;)
     {
         cap >> frame;
+        Mat mask = Mat::zeros(frame.size(), frame.type());
+        Mat final_img;
         if( frame.empty() )
             break;
         frame.copyTo(image);
@@ -90,7 +94,9 @@ int main( int argc, char** argv )
                 }
                 if( !status[i] )
                     continue;
+                cout << status[i] << endl;
                 points[1][k++] = points[1][i];
+                line(mask, points[0][i], points[1][i], Scalar(255,0,0), 2);
                 circle( image, points[1][i], 3, Scalar(0,255,0), -1, 8);
             }
             points[1].resize(k);
@@ -106,7 +112,8 @@ int main( int argc, char** argv )
             addRemovePt = false;
         }
         needToInit = false;
-        imshow("LK Demo", image);
+        add(image, mask, final_img);
+        imshow("LK Demo", final_img);
         char c = (char)waitKey(10);
         if( c == 27 )
             break;

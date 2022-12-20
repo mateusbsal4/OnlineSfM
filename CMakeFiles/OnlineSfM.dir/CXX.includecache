@@ -39,6 +39,16 @@ cmath
 -
 Eigen/Dense
 -
+array
+-
+xtensor/xarray.hpp
+-
+xtensor/xadapt.hpp
+-
+xtensor/xio.hpp
+-
+xtensor/xindex_view.hpp
+-
 
 /usr/include/eigen3/Eigen/Cholesky
 Core

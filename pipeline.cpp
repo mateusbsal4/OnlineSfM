@@ -11,14 +11,22 @@
 #include "opencv2/videoio.hpp"
 #include "opencv2/highgui.hpp"
 #include <iostream>
+#include <cassert>
 #include <ctype.h>
 #include <tuple>
 #include <cmath>
 #include <Eigen/Dense>
+#include <array>
+#include <xtensor/xarray.hpp>
+#include <xtensor/xadapt.hpp>
+#include <xtensor/xio.hpp>
+#include <xtensor/xindex_view.hpp>
+
 using namespace std;
 using namespace cv;
 using namespace cv::utils::logging;
 using namespace Eigen;
+using namespace xt;
 
 bool needToInit = true;
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/casa_cc.MOV";
@@ -68,7 +76,7 @@ class StructureFromMotion{
             //color = get_frames();
             color = get_frames_video();
             Mat mask = Mat::zeros(color.size(), color.type());
-            Mat final_img;
+            Mat tracking_window;
             color.copyTo(image);
             cvtColor(image, gray, COLOR_BGR2GRAY);
             if( needToInit )
@@ -83,8 +91,8 @@ class StructureFromMotion{
                 track_features(mask);
             }
             //needToInit = false;       //[mbs:221129]: testing match_features addition
-            add(image, mask, final_img);
-            imshow("LK Tracker", final_img);
+            add(image, mask, tracking_window);
+            imshow("LK Tracker", tracking_window);
             waitKey(10);
             std::swap(points[1], points[0]);
             cv::swap(prevGray, gray);
@@ -128,9 +136,11 @@ class StructureFromMotion{
 
 
         void match_features(){
-            int n = points[0].size();
-            int m = points[1].size();
-            MatrixXf closeness_table(n,m);
+            size_t n = points[0].size();
+            size_t m = points[1].size();
+            std::vector<size_t> shape = {n, m};
+            xarray<int> closeness_table(shape);
+//            MatrixXf closeness_table(n,m);
 //            size_t k, l;
             for( i = 0; i < n; i++ ){
                 for( j = 0; j < m; j++){
@@ -142,24 +152,43 @@ class StructureFromMotion{
                     }
                 }
             }
-            VectorXf new_points_mask(m);
-            new_points_mask = closeness_table.colwise().sum();   
-            MatrixXf new_features(m,2);
-            for(i = 0; i< m; i++){
-                if(new_points_mask(i)){
-                    float* p1 = &points[1][i].x;
-                    float* p2 = &points[1][i].y;  
-                    new_features(i,0) = *p1;    
-                    new_features(i,1) = *p2;    
+            cout << adapt(closeness_table.shape()) << endl;
+            cout << "CLOS TABLE " << closeness_table << endl;
+            xarray<int> new_points_mask({m});
+            new_points_mask = sum(closeness_table, 0); 
+            for( i = 0; i<m; i++ ){
+                if(new_points_mask(i)==0){
+                    new_points_mask(i) = 1;
                 }
-                //  else{
-                //      removeRow(new_features, i);
-                //  }
-                //cout << "x coordinate of the point:" << new_features(i,0) << endl;
+                else{
+                    new_points_mask(i) = 0;
+                }
             }
+            cout << "NEW POINTS MASK " << new_points_mask << endl;
+            //MatrixXf new_features(m,2);
+        
+            auto new_features = adapt(points[1], {m});
+            cout << "NEW FEATURES " << endl;
             cout << new_features << endl;
-            cout << "SIZE OF " << new_features.rows() << endl;
-            cout << "TOTAL OF " << m << endl;
+            cout << "NEW FEATURES SHAPE" << adapt(new_features.shape()) << endl;
+            cout << "M" << m <<endl;
+            new_features = filter(new_features, new_points_mask);
+            cout << "NEW FEATURES FILTERED: " << new_features << endl;
+            cout << "NEW FEATURES FILTERED SHAPE: " << adapt(new_features.shape()) << endl;
+
+            
+           // cout << new
+           // for(i = 0; i< m; i++){
+           //     if(new_points_mask(i)){
+           //         float* p1 = &points[1][i].x;
+           //         float* p2 = &points[1][i].y;  
+           //         new_features(i,0) = *p1;    
+           //         new_features(i,1) = *p2;    
+           //     }
+           // }
+           // cout << new_features << endl;
+           // cout << "SIZE OF " << new_features.rows() << endl;
+           // cout << "TOTAL OF " << m << endl;
             //points[1] = points[1][new_points_mask];
             
             //for (k=0; k<m; k++){

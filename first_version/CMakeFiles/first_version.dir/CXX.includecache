@@ -57,6 +57,8 @@ xtensor/xmanipulation.hpp
 -
 typeinfo
 -
+algorithm
+-
 
 /usr/include/opencv4/opencv2/calib3d.hpp
 opencv2/core.hpp

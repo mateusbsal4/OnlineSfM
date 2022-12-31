@@ -26,6 +26,7 @@
 #include <xtensor/xoperation.hpp>
 #include <xtensor/xmanipulation.hpp>
 #include <typeinfo>
+#include <algorithm>
 
 
 
@@ -37,7 +38,7 @@ using namespace xt;
 
 
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala1.MOV";
-string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala2.MOV";
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala2.MOV";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala3.mov";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala1.mov";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala2.MOV";
@@ -50,7 +51,7 @@ string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cc.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cd.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/casa_cc.MOV";
-//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/elef5.MOV";
+string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/elef5.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_short/casa.MOV";
 
 
@@ -61,14 +62,16 @@ Size subPixWinSize(10,10), winSize(31,31);            //example (standard OpenCV
 //TermCriteria termcrit(1|2,30,0.003);    
 //Size subPixWinSize(10,10), winSize(15,15);           // tcc criteria
 
+size_t initial_indexes_shape = 1;
+xarray<int> indexes({initial_indexes_shape}); 
 
-VideoCapture cap(path_to_vid);
+VideoCapture cap(path_to_vid);            //post visualization
+//VideoCapture cap(0);                        //online visualization
 
 class StructureFromMotion{
     private:
         vector<Point2f> prev_points, points, new_points;
-        vector<unsigned int> indexes;
-        Mat frame, color, gray,image, prevGray;
+        Mat frame, color, image, gray, prevGray;
         vector<Vec3f> Rs = {};
         vector <Vec3f> Ts = {};
         vector<Vec3f> points3d = {};
@@ -83,8 +86,8 @@ class StructureFromMotion{
         const double closeness_threshold = 15;
         const int min_features = 100; //original:35
         bool needToInit = 1;
-        bool first_frame = 1;
-
+        //bool first_frame = 1;
+        int start_index = 0;
 
 
 
@@ -99,44 +102,46 @@ class StructureFromMotion{
         void runSfM(){
             for(;;){
                 feature_detector();
+
             }
         }
 
-        void feature_detector(){    
-            cout << "Where is this error? 1 " << endl;
+        void feature_detector(){
+            cap >> frame;    
+            Mat image;
             CV_LOG_INFO(&TAG, "Detecting Features");
-            //color = get_frames();
-            color = get_frames_video();
+            color = frame;
             Mat mask = Mat::zeros(color.size(), color.type());
             Mat tracking_window;
             color.copyTo(image);
             cvtColor(image, gray, COLOR_BGR2GRAY);
-
+            //cvtColor(color, gray, COLOR_BGR2GRAY);
             if( needToInit )
             {
-                get_new_features();
-                cout << "Where is this error? 3 " << endl;                
+                get_new_features();      
                 needToInit = false;
+                start_index = amax(indexes)()+1;
+
+                cout << "Start index: " << start_index << endl;
             }
 
+
             else if( !prevGray.empty() ){
-                track_features(mask);
-                cout << "Where is this error? 4 " << endl;
+                track_features(mask, image);
             }
 
             add(image, mask, tracking_window);
+            //add(color, mask, tracking_window);
             imshow("LK Tracker", tracking_window);
             waitKey(10);
 
             std::swap(points, prev_points);
             cv::swap(prevGray, gray);
-
-            cout << "Where is this error? 5 " << endl;
             if(prev_points.size() < min_features){
                 needToInit = 1;
             }
-
-
+            cout << "INDEXES" << indexes << endl;
+            
         }
 
 
@@ -145,27 +150,26 @@ class StructureFromMotion{
             goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.01, 10, Mat(), 3, 3, 0, 0.04);   //example (standard OpenCV) params - block size (3) is too small! This selects too many features
             cornerSubPix(gray, new_points, subPixWinSize, Size(-1,-1), termcrit);
             //goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.5, 15, Mat(), 10,3, 0, 0.04);    //tcc params 
-            if(!first_frame){
-                cout << "Where is this error? 2 " << endl;
+//            if(!first_frame){
+            if(!points.empty()){
                 match_features();
             }
             else{
-                //size_t n = new_points.size()
-                //xarray<int> indexes({n});
-                //indexes = arange(n);
                 points = new_points;
+                indexes.resize({points.size()});
+                indexes = arange(points.size());
+
             }
-            first_frame = 0;
+//            first_frame = 0;    
         }
 
-        void track_features(Mat mask){
+        void track_features(Mat mask, Mat image){
             vector<uchar> status;
             vector<float> err;
             if(prevGray.empty())
                 gray.copyTo(prevGray);
             calcOpticalFlowPyrLK(prevGray, gray, prev_points, points, status, err, winSize,
                                  3, termcrit, 0, 0.001); 
-            //cout << " POINTS BEFORE SHOWING: " << prev_points << endl;
             for( i = j = 0; i < points.size(); i++ )
             {
                 if( !status[i] )
@@ -176,6 +180,10 @@ class StructureFromMotion{
             }
             points.resize(j);
 
+            cout << "INDEXES BEFORE TRACKING: " << indexes;
+            auto xstatus = adapt(status, {status.size()});  
+            indexes = filter(indexes, xstatus);
+            cout << "INDEXES AFTER TRACKING: " << indexes;
         }
 
 
@@ -220,16 +228,18 @@ class StructureFromMotion{
 
             //cout << "NEW FEATURES SIZE " << new_features.size() << endl;
             //cout << "NEW FEATURES DIMENSION " << new_features.dimension() << endl;
-
-            cout << "OLD FEATURES SIZE " << old_features.size() << endl;
-            cout << "FEATURES' DIMENSION: " << old_features.dimension() << endl;
+            //cout << "OLD FEATURES SIZE " << old_features.size() << endl;
+            //cout << "FEATURES' DIMENSION: " << old_features.dimension() << endl;
 
             new_features = filter(new_features, new_points_mask);
-            auto new_indexes = arange(0, ones_in_mask);
+            assert(ones_in_mask == new_features.size());
+            auto new_indexes = arange(0, ones_in_mask)+start_index;
+
+
             //cout << "NEW FEATURES FILTERED: " << new_features << endl;
             //cout << "NEW FEATURES FILTERED SHAPE: " << adapt(new_features.shape()) << endl;
-            cout << "NEW FEATURES FILTERED SIZE " << new_features.size() << endl;
-            cout << "NEW FEATURES FILTERED DIMENSION " << new_features.dimension() << endl;
+            //cout << "NEW FEATURES FILTERED SIZE " << new_features.size() << endl;
+            //cout << "NEW FEATURES FILTERED DIMENSION " << new_features.dimension() << endl;
             //features = np.vstack((old_features, new_features))
             //indexes = np.concatenate((old_indexes, new_indexes))
             //vector<int> old_shape = {n, 1};
@@ -238,21 +248,21 @@ class StructureFromMotion{
             //new_features.reshape(new_shape);
             //cout << "OLD FEATURES RESHAPED: " << old_features << endl; 
             //cout << "NEW FEATURES RESHAPED: " << new_features << endl;
+
             auto features = xt::hstack(xtuple(old_features, new_features));
-            cout << "FEATURES' SIZE: " << features.size() << endl;
-            cout << "FEATURES' DIMENSION: " << features.dimension() << endl;
+            indexes = xt::hstack(xtuple(indexes, new_indexes));
+            //cout << "FEATURES' SIZE: " << features.size() << endl;
+            //cout << "FEATURES' DIMENSION: " << features.dimension() << endl;
 
 
-            cout << "OLD FEATURES: " << old_features << endl;
-            cout << "NEW FEATURES FILTERED: " << new_features << endl;
-            cout << "ALL FEATURES: " << features << endl;
+            //cout << "OLD FEATURES: " << old_features << endl;
+            //cout << "NEW FEATURES FILTERED: " << new_features << endl;
+            //cout << "ALL FEATURES: " << features << endl;
 
             vector<Point2f> feats(features.begin(), features.end());
             points = feats;
-            cout << "POINTS 1: " << points << endl;
 
-
-
+            assert(points.size() ==indexes.size());
         }   
 
 
@@ -280,14 +290,14 @@ class StructureFromMotion{
         //}
 
         // THIS IS FOR POST VISUALIZATION
-        Mat get_frames_video(){
-            //frame_counter ++;    //needs solving!! counter is NOT working
-            if(frame_counter%(frames_to_skip+1) ==0){
-                    cap >> frame;
-                    return frame;
-
-            }
-        }
+        //Mat get_frames_video(){
+        //    //frame_counter ++;    //needs solving!! counter is NOT working
+        //    if(frame_counter%(frames_to_skip+1) ==0){
+        //            cap >> frame;
+        //            return frame;
+//
+        //    }
+        //}
 
 
 
@@ -298,5 +308,5 @@ class StructureFromMotion{
 int main(){
     StructureFromMotion sfm;
     sfm.runSfM();
-
+    return 0;    
 }

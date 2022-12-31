@@ -36,8 +36,8 @@ using namespace cv::utils::logging;
 using namespace xt;
 
 
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala1.MOV";
-string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala2.MOV";
+string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala1.MOV";
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala2.MOV";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala3.mov";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala1.mov";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala2.MOV";
@@ -55,10 +55,10 @@ string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/
 
 
 //THESE CRITERIA ARE SENSITIVE TO CHANGES
-//TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS,20,0.03);        
-//Size subPixWinSize(10,10), winSize(31,31);            //example (standard OpenCV) criteria
-TermCriteria termcrit(1|2,30,0.003);    
-Size subPixWinSize(10,10), winSize(15,15);           // tcc criteria
+TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS,20,0.03);        
+Size subPixWinSize(10,10), winSize(31,31);            //example (standard OpenCV) criteria
+//TermCriteria termcrit(1|2,30,0.003);    
+//Size subPixWinSize(10,10), winSize(15,15);           // tcc criteria
 
 VideoCapture cap(path_to_vid);
 
@@ -123,12 +123,9 @@ class StructureFromMotion{
 
 
         void get_new_features(){
-//            goodFeaturesToTrack(gray, points, MAX_COUNT, 0.01, 10, Mat(), 3, 3, 0, 0.04);       //WROOOONG!!!!!
-
-
-            //goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.01, 10, Mat(), 3, 3, 0, 0.04);   //example (standard OpenCV) params - block size (3) is too small! This selects too many features
-            //cornerSubPix(gray, new_points, subPixWinSize, Size(-1,-1), termcrit);
-            goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.5, 15, Mat(), 10,3, 0, 0.04);    //tcc params 
+            goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.01, 10, Mat(), 3, 3, 0, 0.04);   //example (standard OpenCV) params - block size (3) is too small! This selects too many features
+            cornerSubPix(gray, new_points, subPixWinSize, Size(-1,-1), termcrit);
+            // goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.5, 15, Mat(), 10,3, 0, 0.04);    //tcc params 
             if(!points.empty()){
                 match_features();   
             }
@@ -208,6 +205,7 @@ class StructureFromMotion{
 
             new_features = filter(new_features, new_points_mask);
             auto new_indexes = arange(0, ones_in_mask);
+            cout << "NEW INDEXES: " << new_indexes << endl;
             //cout << "NEW FEATURES FILTERED: " << new_features << endl;
             //cout << "NEW FEATURES FILTERED SHAPE: " << adapt(new_features.shape()) << endl;
             //cout << "NEW FEATURES FILTERED SIZE " << new_features.size() << endl;
@@ -293,5 +291,5 @@ class StructureFromMotion{
 int main(){
     StructureFromMotion sfm;
     sfm.runSfM();
-
+    return 0;
 }

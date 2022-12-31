@@ -62,10 +62,12 @@ int main( int argc, char** argv )
         Mat final_img;
         if( frame.empty() )
             break;
-        frame.copyTo(image);
-        cvtColor(image, gray, COLOR_BGR2GRAY);
+        //frame.copyTo(image);
+        //cvtColor(image, gray, COLOR_BGR2GRAY);
+        cvtColor(frame, gray, COLOR_BGR2GRAY);
         if( nightMode )
-            image = Scalar::all(0);
+            frame = Scalar::all(0);
+            //image = Scalar::all(0);
         if( needToInit )
         {
             // automatic initialization
@@ -97,7 +99,8 @@ int main( int argc, char** argv )
                 cout << status[i] << endl;
                 points[1][k++] = points[1][i];
                 line(mask, points[0][i], points[1][i], Scalar(255,0,0), 2);
-                circle( image, points[1][i], 3, Scalar(0,255,0), -1, 8);
+                //circle( image, points[1][i], 3, Scalar(0,255,0), -1, 8);
+                circle( frame, points[1][i], 3, Scalar(0,255,0), -1, 8);
             }
             points[1].resize(k);
         }
@@ -112,7 +115,8 @@ int main( int argc, char** argv )
             addRemovePt = false;
         }
         needToInit = false;
-        add(image, mask, final_img);
+        //add(image, mask, final_img);
+        add(frame, mask, final_img);
         imshow("LK Demo", final_img);
         char c = (char)waitKey(10);
         if( c == 27 )

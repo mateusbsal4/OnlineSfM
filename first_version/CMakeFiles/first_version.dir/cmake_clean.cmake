@@ -1,5 +1,6 @@
 file(REMOVE_RECURSE
   "CMakeFiles/first_version.dir/pipeline.cpp.o"
+  "CMakeFiles/first_version.dir/pipeline.cpp.o.d"
   "first_version"
   "first_version.pdb"
 )

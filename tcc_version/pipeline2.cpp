@@ -36,7 +36,7 @@ using namespace cv::utils::logging;
 using namespace xt;
 
 
-string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala1.MOV";
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala1.MOV";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala2.MOV";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala3.mov";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala1.mov";
@@ -47,7 +47,7 @@ string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto2.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto3.MOV";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segundo_quarto.MOV";
-//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cc.MOV";
+string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cc.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/casa_cc.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cd.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_short/casa.MOV";
@@ -55,12 +55,15 @@ string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/
 
 
 //THESE CRITERIA ARE SENSITIVE TO CHANGES
-TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS,20,0.03);        
-Size subPixWinSize(10,10), winSize(31,31);            //example (standard OpenCV) criteria
-//TermCriteria termcrit(1|2,30,0.003);    
-//Size subPixWinSize(10,10), winSize(15,15);           // tcc criteria
+//TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS,20,0.03);        
+//Size subPixWinSize(10,10), winSize(31,31);            //example (standard OpenCV) criteria
+TermCriteria termcrit(1|2,30,0.003);    
+Size subPixWinSize(10,10), winSize(15,15);           // tcc criteria
 
 VideoCapture cap(path_to_vid);
+size_t initial_indexes_shape = 1;
+xarray<int> indexes({initial_indexes_shape}); 
+
 
 class StructureFromMotion{
     private:
@@ -71,7 +74,7 @@ class StructureFromMotion{
         Matx33f K = {};
         Mat frame, color_frame, image, gray, prevGray;
         vector<Point2f> points, prev_points, new_points;
-        vector<unsigned int> indexes;
+        //vector<unsigned int> indexes;
         const int frames_to_skip = 1;
         const LogTag TAG = LogTag("SfM", LOG_LEVEL_DEBUG);
         int frame_counter = 0;
@@ -81,7 +84,7 @@ class StructureFromMotion{
         const double closeness_threshold = 15;
         const int min_features = 100; 
         bool reset_features = 1;
-
+        int start_index = 0;
 
 
 
@@ -110,6 +113,7 @@ class StructureFromMotion{
             if( reset_features ){
                 reset_features = 0;
                 get_new_features();
+                start_index = amax(indexes)()+1;
             }
             prev_points = points;
             prevGray = gray;
@@ -123,14 +127,16 @@ class StructureFromMotion{
 
 
         void get_new_features(){
-            goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.01, 10, Mat(), 3, 3, 0, 0.04);   //example (standard OpenCV) params - block size (3) is too small! This selects too many features
-            cornerSubPix(gray, new_points, subPixWinSize, Size(-1,-1), termcrit);
-            // goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.5, 15, Mat(), 10,3, 0, 0.04);    //tcc params 
+            //goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.01, 10, Mat(), 3, 3, 0, 0.04);   //example (standard OpenCV) params - block size (3) is too small! This selects too many features
+            //cornerSubPix(gray, new_points, subPixWinSize, Size(-1,-1), termcrit);
+            goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.5, 15, Mat(), 10,3, 0, 0.04);    //tcc params 
             if(!points.empty()){
                 match_features();   
             }
             else{
                 points = new_points;
+                indexes.resize({points.size()});
+                indexes = arange(points.size());
             }
         }
 
@@ -152,10 +158,9 @@ class StructureFromMotion{
             //cout << "FEATURES FILTERED: " << features << endl;
             vector<Point2f> feats(features.begin(), features.end());
             points = feats;
-            //for(i = 0; i<points.size(); i++){
-            //    assert(points[i]==features(i));
-            //}
-
+            cout << "INDEXES BEFORE TRACKING: " << indexes;
+            indexes = filter(indexes, xstatus);
+            cout << "INDEXES AFTER TRACKING: " << indexes;
         }
 
         void match_features(){
@@ -193,7 +198,6 @@ class StructureFromMotion{
             //cout << "THERE ARE: " << ones_in_mask << " ONES IN MASK" << endl;
             auto old_features  = adapt(points, {n});
             auto new_features = adapt(new_points, {m});
-            
 
 
 
@@ -204,8 +208,8 @@ class StructureFromMotion{
             //cout << "FEATURES' DIMENSION: " << old_features.dimension() << endl;
 
             new_features = filter(new_features, new_points_mask);
-            auto new_indexes = arange(0, ones_in_mask);
-            cout << "NEW INDEXES: " << new_indexes << endl;
+            assert(ones_in_mask == new_features.size());
+            auto new_indexes = arange(0, ones_in_mask)+start_index;
             //cout << "NEW FEATURES FILTERED: " << new_features << endl;
             //cout << "NEW FEATURES FILTERED SHAPE: " << adapt(new_features.shape()) << endl;
             //cout << "NEW FEATURES FILTERED SIZE " << new_features.size() << endl;
@@ -219,6 +223,7 @@ class StructureFromMotion{
             //cout << "OLD FEATURES RESHAPED: " << old_features << endl; 
             //cout << "NEW FEATURES RESHAPED: " << new_features << endl;
             auto features = xt::hstack(xtuple(old_features, new_features));
+            indexes = xt::hstack(xtuple(indexes, new_indexes));
             //cout << "FEATURES' SIZE: " << features.size() << endl;
             //cout << "FEATURES' DIMENSION: " << features.dimension() << endl;
 
@@ -231,6 +236,7 @@ class StructureFromMotion{
             points = feats;
             //cout << "POINTS 1: " << points << endl;
 
+            assert(points.size() ==indexes.size());
 
 
         }   

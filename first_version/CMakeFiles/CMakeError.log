@@ -1,0 +1,19 @@
+Determining if the function sgemm_ exists failed with the following output:
+Change Dir: /home/mateus/IC/OnlineSfM/first_version/CMakeFiles/CMakeScratch/TryCompile-XvVP4l
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_b970f/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_b970f.dir/build.make CMakeFiles/cmTC_b970f.dir/build
+gmake[1]: Entering directory '/home/mateus/IC/OnlineSfM/first_version/CMakeFiles/CMakeScratch/TryCompile-XvVP4l'
+Building C object CMakeFiles/cmTC_b970f.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=sgemm_ -o CMakeFiles/cmTC_b970f.dir/CheckFunctionExists.c.o -c /home/mateus/IC/OnlineSfM/first_version/CMakeFiles/CMakeScratch/TryCompile-XvVP4l/CheckFunctionExists.c
+Linking C executable cmTC_b970f
+/snap/cmake/1210/bin/cmake -E cmake_link_script CMakeFiles/cmTC_b970f.dir/link.txt --verbose=1
+/usr/bin/cc  -DCHECK_FUNCTION_EXISTS=sgemm_ -rdynamic CMakeFiles/cmTC_b970f.dir/CheckFunctionExists.c.o -o cmTC_b970f 
+/usr/bin/ld: CMakeFiles/cmTC_b970f.dir/CheckFunctionExists.c.o: in function `main':
+CheckFunctionExists.c:(.text+0x14): undefined reference to `sgemm_'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_b970f.dir/build.make:99: cmTC_b970f] Error 1
+gmake[1]: Leaving directory '/home/mateus/IC/OnlineSfM/first_version/CMakeFiles/CMakeScratch/TryCompile-XvVP4l'
+gmake: *** [Makefile:127: cmTC_b970f/fast] Error 2
+
+
+

@@ -90,7 +90,7 @@ class StructureFromMotion{
         Mat frame, color, image, gray, prevGray;
         vector<int> frame_numbers, mask;
         int frame_number;
-        vector<xarray<double>> Rs, Ts;       
+        //vector<xarray<double>> Rs, Ts;       
         vector<Point3f> cloud = {};
         //Matx33f K = {4826.28455, 0.0, 1611.73703,
         //             0.0, 4827.31363, 1330.23261,
@@ -116,6 +116,9 @@ class StructureFromMotion{
         double ransac_probability = 0.999999;
         double essential_mat_threshold = 5;
         double distance_thresh = 500;
+
+        bool use_epnp = 1;
+        bool use_iterative_pnp = 0;
 
 
 
@@ -324,29 +327,40 @@ class StructureFromMotion{
         void init_reconstruction(vector<vector<Point2f>> tracks, vector<vector<int>> masks){
             vector<vector<Point2f>> init_tracks;
             vector<vector<int>> init_masks;
+            vector<xarray<double>> Rs, Ts; 
             for(i = 0; i < tracks.size(); i++){
                 init_tracks.push_back(tracks[i]);
                 init_masks.push_back(masks[i]);
 
                 if(cloud.empty()){
                     if(init_tracks.size() > 1 && init_tracks[0].size() >= 5){
-                        five_pt_init(init_tracks, init_masks);
+                        tie(Rs, Ts) = five_pt_init(init_tracks, init_masks);
                     }
                     continue;
                 }
+                //calculate_projection(Rs(Rs.size()-1), Ts(Ts.size()-1), init_tracks, init_masks)
             }
 
 
         }
 
+        //void calculate_projection(xarray<double> prev_R, xarray<double> prev_T, vector<vector<Point2f>> tracks, vector<vector<int>> masks){
+        //    xarray<double> R, T;
+        //        tie(R, T) = solve_pnp(tracks[tracks.size()-1], masks[masks.size() -1]);
+        //}
+//
+//        //tuple<xarray<double>, xarray<double>> solve_pnp(track, mask){
+        //        
+        //}
 
 
-        void five_pt_init(vector<vector<Point2f>> init_tracks, vector<vector<int>> init_masks){
+
+        tuple<vector<xarray<double>>, vector<xarray<double>>> five_pt_init(vector<vector<Point2f>> init_tracks, vector<vector<int>> init_masks){
             if(init_tracks.size()>2){
                 init_tracks = vector<vector<Point2f>> (init_tracks.end()-1, init_tracks.end());
                 init_masks = vector<vector<int>> (init_masks.end()-1, init_masks.end());
             }
-            Mat E, five_pt_mask, mask, R2, t2;
+            Mat E, five_pt_mask, mask, R2, t2; 
             xarray<double> R({3,3});
             xarray<double> T({3,1});
             //cout << "Dimension OF EMPTY R: " << R.dimension() << endl;
@@ -359,10 +373,8 @@ class StructureFromMotion{
             //xarray<xarray<double>> Ts({3,1,1});
             //Rs += R;
             //Ts += T;
-            //vector<xarray<double>> Rs = {eye(3)};
-            //vector<xarray<double>> Ts = {zeros<double>({3,1})};
-            //xarray<xarray<double>> Rs = {eye(3)};
-            //xarray<xarray<double>> Ts = {zeros<double>({3,1})};
+            vector<xarray<double>> Rs = {eye(3)};
+            vector<xarray<double>> Ts = {zeros<double>({3,1})};
             vector<vector<Point2f>> track_pair;
             xarray<int> pair_mask;
             tie(track_pair, pair_mask)  = get_last_track_pair(init_tracks, init_masks);
@@ -401,6 +413,7 @@ class StructureFromMotion{
             points_to_cloud(points3d, pair_mask); 
             Rs.push_back(R);
             Ts.push_back(T);
+            return make_tuple(Rs, Ts);
 
         }
 
@@ -612,7 +625,6 @@ class StructureFromMotion{
 
 
             return make_tuple(track_pair, xpair_mask);
-
 
         }
 

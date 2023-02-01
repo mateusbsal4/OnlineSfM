@@ -28,6 +28,7 @@
 #include <xtensor/xmanipulation.hpp>
 #include <xtensor/xset_operation.hpp>
 #include <xtensor-blas/xlinalg.hpp>
+#include <xtensor/xview.hpp>
 #include <typeinfo>
 #include <algorithm>
 
@@ -45,7 +46,7 @@ using namespace xt;
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala2.MOV";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala3.mov";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala1.mov";
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala2.MOV";
+string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala2.MOV";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala3.MOV";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala4.MOV";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto1.MOV";
@@ -55,7 +56,7 @@ using namespace xt;
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cc.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cd.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/casa_cc.MOV";
-string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/elef5.MOV";
+//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/elef5.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_short/casa.MOV";
 
 
@@ -64,6 +65,7 @@ string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/p
 //THESE CRITERIA ARE SENSITIVE TO CHANGES
 TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS,20,0.03);
 Size subPixWinSize(10,10), winSize(31,31);            //example (standard OpenCV) criteria
+
 //TermCriteria termcrit(1|2,30,0.003);
 //Size subPixWinSize(10,10), winSize(15,15);           // tcc criteria
 
@@ -79,8 +81,8 @@ xarray<int> indexes({initial_indexes_shape});
 
 
 
-//VideoCapture cap(path_to_vid);            //post visualization
-VideoCapture cap(0);                        //online visualization
+VideoCapture cap(path_to_vid);            //post visualization
+//VideoCapture cap(0);                        //online visualization
 
 class StructureFromMotion{
     private:
@@ -90,7 +92,8 @@ class StructureFromMotion{
         Mat frame, color, image, gray, prevGray;
         vector<int> frame_numbers, mask;
         int frame_number;
-        //vector<xarray<double>> Rs, Ts;       
+        //vector<xarray<double>> Rs, Ts; 
+        vector<Mat> Rs, Ts;       
         vector<Point3f> cloud = {};
         //Matx33f K = {4826.28455, 0.0, 1611.73703,
         //             0.0, 4827.31363, 1330.23261,
@@ -102,6 +105,7 @@ class StructureFromMotion{
         const LogTag TAG = LogTag("SfM", LOG_LEVEL_DEBUG);
         size_t frame_counter = 0;
         size_t i, j;
+        size_t initial_counter = 0;
         const int MAX_COUNT = 500;
         //const int MAX_COUNT = 100;      //tcc param
         const double closeness_threshold = 15;
@@ -119,11 +123,13 @@ class StructureFromMotion{
 
         bool use_epnp = 1;
         bool use_iterative_pnp = 0;
+        int min_number_of_points = 5;
+
+        bool use_five_pt_algorithm = 0;
+        bool use_solve_pnp = 1;
 
 
-
-
-
+        
 
 
     public:
@@ -142,11 +148,14 @@ class StructureFromMotion{
                     continue;
                 }
                 if(is_init){
+                    initial_counter = 0;
                     std::vector<vector<Point2f>> init_tracks = std::vector<vector<Point2f>> (tracks.begin(), tracks.begin()+init_reconstruction_frames);
-                    std::vector<vector<int>> init_masks = std::vector<vector<int>> (masks.begin(), masks.begin()+init_reconstruction_frames);
-                    std::vector<int> init_frame_numbers = std::vector<int> (frame_numbers.begin(), frame_numbers.begin()+init_reconstruction_frames);
-                    assert(init_tracks.size() == init_masks.size());
+                    std::vector<vector<int>> init_masks = std::vector<vector<int>> (masks.begin(), masks.begin()+init_reconstruction_frames);               //remember that here some sort of update mechanism is necessary 
+                    //std::vector<int> init_frame_numbers = std::vector<int> (frame_numbers.begin(), frame_numbers.begin()+init_reconstruction_frames);       //in order to allow the repetition of the init_reconstruction phase. For instance, 
+                    assert(init_tracks.size() == init_masks.size());                                                                                        //sth like summing a "dropped_tracks = 1" integer to both ends of the iterator(this variable will depend on the reconstruction error)
+                    cout << "III: " << initial_counter << endl;
                     init_reconstruction(init_tracks, init_masks);
+                    is_init = 0;
                     continue;
                 }
             }
@@ -165,8 +174,8 @@ class StructureFromMotion{
             //cvtColor(color, gray, COLOR_BGR2GRAY);
             if( needToInit )
             {
-                get_new_features();
-                needToInit = false;
+                get_new_features(mask, image);
+                needToInit = 0;
                 start_index = amax(indexes)()+1;
 
                 cout << "Start index: " << start_index << endl;
@@ -198,21 +207,19 @@ class StructureFromMotion{
 
 
 
-        void get_new_features(){
+        void get_new_features(Mat mask, Mat image){
             goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.01, 10, Mat(), 3, 3, 0, 0.04);   //example (standard OpenCV) params - block size (3) is too small! This selects too many features
             cornerSubPix(gray, new_points, subPixWinSize, Size(-1,-1), termcrit);
             //goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.5, 15, Mat(), 10,3, 0, 0.04);    //tcc params
-//            if(!first_frame){
             if(!points.empty()){
+                track_features(mask, image);
                 match_features();
             }
             else{
                 points = new_points;
                 indexes.resize({points.size()});
                 indexes = arange(points.size());
-
             }
-//            first_frame = 0;
         }
 
         void track_features(Mat mask, Mat image){
@@ -241,13 +248,13 @@ class StructureFromMotion{
 
 
         void match_features(){
-            size_t n = prev_points.size();
+            size_t n = points.size();
             size_t m = new_points.size();
             vector<size_t> shape = {n, m};
             xarray<int> closeness_table(shape);
             for( i = 0; i < n; i++ ){
                 for( j = 0; j < m; j++){
-                    if(norm(prev_points[i],new_points[j]) <= closeness_threshold){
+                    if(norm(points[i],new_points[j]) <= closeness_threshold){
                         closeness_table(i,j)=1;
                     }
                     else{
@@ -273,44 +280,19 @@ class StructureFromMotion{
             //cout << "MASK SIZE " << new_points_mask.size() << endl;
             //cout << "MASK DIMENSION " << new_points_mask.dimension() << endl;
             //cout << "THERE ARE: " << ones_in_mask << " ONES IN MASK" << endl;
-            auto old_features  = adapt(prev_points, {n});
+            auto old_features  = adapt(points, {n});
             auto new_features = adapt(new_points, {m});
 
 
-
-            //cout << "NEW FEATURES SIZE " << new_features.size() << endl;
-            //cout << "NEW FEATURES DIMENSION " << new_features.dimension() << endl;
-            //cout << "OLD FEATURES SIZE " << old_features.size() << endl;
-            //cout << "FEATURES' DIMENSION: " << old_features.dimension() << endl;
 
             new_features = filter(new_features, new_points_mask);
             assert(ones_in_mask == new_features.size());
             auto new_indexes = arange(0, ones_in_mask)+start_index;
 
-
-            //cout << "NEW FEATURES FILTERED: " << new_features << endl;
-            //cout << "NEW FEATURES FILTERED SHAPE: " << adapt(new_features.shape()) << endl;
-            //cout << "NEW FEATURES FILTERED SIZE " << new_features.size() << endl;
-            //cout << "NEW FEATURES FILTERED DIMENSION " << new_features.dimension() << endl;
-            //features = np.vstack((old_features, new_features))
-            //indexes = np.concatenate((old_indexes, new_indexes))
-            //vector<int> old_shape = {n, 1};
-            //vector<size_t> new_shape = {ones_in_mask, 1};
-            //old_features.resize(old_shape);
-            //new_features.reshape(new_shape);
-            //cout << "OLD FEATURES RESHAPED: " << old_features << endl;
-            //cout << "NEW FEATURES RESHAPED: " << new_features << endl;
-            //features.resize(old_features.size()+new_features.size());
             auto features = xt::hstack(xtuple(old_features, new_features));
             //auto features = xt::hstack(xtuple(old_features, new_features));
             indexes = xt::hstack(xtuple(indexes, new_indexes));
-            //cout << "FEATURES' SIZE: " << features.size() << endl;
-            //cout << "FEATURES' DIMENSION: " << features.dimension() << endl;
 
-            //cout << "OLD FEATURES: " << old_features << endl;
-            //cout << "NEW FEATURES FILTERED: " << new_features << endl;
-            //cout << "ALL FEATURES: " << features << endl;
-            //cout << "a feature: " << features(1) << endl;
             vector<Point2f> feats(features.begin(), features.end());
             points = feats;
 
@@ -324,98 +306,226 @@ class StructureFromMotion{
         }
 
 
-        void init_reconstruction(vector<vector<Point2f>> tracks, vector<vector<int>> masks){
-            vector<vector<Point2f>> init_tracks;
-            vector<vector<int>> init_masks;
-            vector<xarray<double>> Rs, Ts; 
-            for(i = 0; i < tracks.size(); i++){
-                init_tracks.push_back(tracks[i]);
-                init_masks.push_back(masks[i]);
 
+        void init_reconstruction(vector<vector<Point2f>> init_tracks, vector<vector<int>> init_masks){
+            Mat R, T;
+            vector<Point3f> pts_3d;
+            xarray<int> indexes;
+
+            for(initial_counter = 0; initial_counter < init_reconstruction_frames; initial_counter++){      
+                cout << "I N I T I A L " << endl;
+                cout << "C O U N T E R " << initial_counter << endl;   
+                cout << "Do u stay here for 5 times? " << endl;
+                cout << "SIZE OF INIT TRACKS 0: " << init_tracks.size() << endl;
+                vector<vector<Point2f>> init_tracks_sliced  = std::vector<vector<Point2f>> (init_tracks.begin(), init_tracks.begin()+initial_counter+1);                     
+                vector<vector<int>> init_masks_sliced = std::vector<vector<int>> (init_masks.begin(), init_masks.begin()+initial_counter+1);                     
+                cout << "SIZE OF INIT TRACKS: " << init_tracks_sliced.size() << endl;
                 if(cloud.empty()){
-                    if(init_tracks.size() > 1 && init_tracks[0].size() >= 5){
-                        tie(Rs, Ts) = five_pt_init(init_tracks, init_masks);
+                    if(init_masks_sliced.size() > 1 && init_tracks_sliced[0].size() >= 5){
+                        cout << "Entering? " << endl;
+                        tie(Rs, Ts) = five_pt_init(init_tracks_sliced, init_masks_sliced);
+                        cout << "SIZE OF INIT TRACKS 2: " << init_tracks_sliced.size() << endl;
+                        //cout << Rs[0] << endl;
+                        assert(Rs.size() == 2);
                     }
+                    //cout << "RSSSSS: " << Rs[0] << endl;
                     continue;
                 }
-                //calculate_projection(Rs(Rs.size()-1), Ts(Ts.size()-1), init_tracks, init_masks)
-            }
-
-
+                assert(Rs.size() == 2);
+                cout << "Size of Rs" << Rs.size() << endl;
+                //cout << "Rs 0" << Rs[0] << endl;
+                //cout << Rs[Rs.size()-1] << endl;            // wrong!!
+                cout << "Getting f** here ?" << endl;
+                cout << "SIZE OF INIT TRACKS 3: " << init_tracks_sliced.size() << endl;
+                tie(R, T, pts_3d, indexes) = calculate_projection(Rs[Rs.size()-1], Ts[Ts.size()-1], init_tracks_sliced, init_masks_sliced);
+                cout << "Town??? " << endl;
+                //if(!pts_3d.empty()){
+                //    add_points_to_cloud(pts_3d, indexes);
+                //}
+            }  
         }
 
-        //void calculate_projection(xarray<double> prev_R, xarray<double> prev_T, vector<vector<Point2f>> tracks, vector<vector<int>> masks){
-        //    xarray<double> R, T;
-        //        tie(R, T) = solve_pnp(tracks[tracks.size()-1], masks[masks.size() -1]);
-        //}
-//
-//        //tuple<xarray<double>, xarray<double>> solve_pnp(track, mask){
-        //        
-        //}
+
+
+        tuple<Mat, Mat, vector<Point3f>, xarray<int>> calculate_projection(Mat prev_R, Mat prev_T, vector<vector<Point2f>> tracks, vector<vector<int>> masks){
+            assert((use_epnp == 1 && use_five_pt_algorithm ==0) || (use_epnp ==0 && use_five_pt_algorithm == 1 && use_iterative_pnp == 1));
+            Mat R, T;
+            vector<vector<Point2f>> track_pair;
+            xarray<int> pair_mask;
+            cout << "What about here? " << endl;
+            tie(track_pair, pair_mask)  = get_last_track_pair(tracks, masks);
+            cout << "Getting here 0? " << endl;
+            cout << "R 0 " << R << endl;
+            if(use_five_pt_algorithm){
+                tie(R, T) = five_pt(track_pair, pair_mask, prev_R, prev_T);
+            }
+            if(use_solve_pnp){
+                tie(R, T) = solve_pnp(tracks[tracks.size()-1], masks[masks.size() -1], R, T);       
+            }
+            cout << "R 1 " << R << endl;
+            cout << "T 1 " << T << endl;
+            cout << "prev R: " << prev_R << endl;
+            cout << "prev T: " << prev_T << endl;
+            //triangulate(prev_R, prev_T, R, T, )
+            cout << "Getting here? " << endl;
+            vector<Point3f> points_3d = triangulate(prev_R.t(), -(prev_R.t())*prev_T, R.t(), -(R.t())*T, track_pair);           //careful here!! Cv operations wont work with empty matrices
+            return make_tuple(R, T, points_3d, pair_mask);  
+        }
+
+        
+        tuple<Mat, Mat> solve_pnp(vector<Point2f> track, vector<int> mask, Mat R_est, Mat T_est){
+            Mat R, T;
+            if(use_epnp){
+                tie(R, T) = solve_pnp_(track, mask, SOLVEPNP_EPNP, R_est, T_est);
+                cout << "R 2 " << R << endl;
+                R_est = R;
+                T_est = T;
+            }
+            if(use_iterative_pnp){
+                //R = xarray_to_mat_elementwise(xR);
+                //T = xarray_to_mat_elementwise(xT);
+                cout << "R 3 " << R << endl;
+                tie(R, T) = solve_pnp_(track, mask, SOLVEPNP_ITERATIVE, R_est, T_est);
+            }
+            cout << "R 4: " << R << endl;
+            return make_tuple(R, T);
+        }
+
+        tuple<Mat, Mat> solve_pnp_(vector<Point2f> track_slice, vector<int> track_mask, cv::SolvePnPMethod method, Mat R, Mat T){
+            cout << "Getting here? " << endl;
+           bool use_extrinsic_guess = (!R.empty() && !T.empty()) ? 1 : 0;
+           xarray<int> xcloud_mask = get_not_nan_index_mask(); 
+           //cout << "XCLOUD MASK: " << xcloud_mask << endl;
+           vector<int> cloud_mask(xcloud_mask.begin(), xcloud_mask.end());
+           xarray<int> intersection_mask = get_intersection_mask(cloud_mask, track_mask);
+           //cout << "Intersection mask: " << intersection_mask << endl; 
+           cout << "Size of cloud: " << cloud.size() << endl;
+
+           xarray<int> xtrack_mask = adapt(track_mask, {track_mask.size()});
+           xarray<bool> track_bool_mask = isin(xtrack_mask, intersection_mask);
+           cout << "Size of intersection mask: " << intersection_mask.size() << endl;
+           if(intersection_mask.size()<min_number_of_points){
+                return make_tuple(R,T);
+           }
+           cout << "Here? " << endl;
+           tie(R, T) = invert_reference_frame(R,T);
+           cout << "Intersection mask: " << intersection_mask << endl;
+           vector<Point3f> pts_cloud;
+           for(i = 0; i<cloud.size(); i++){
+            if(std::find(intersection_mask.begin(), intersection_mask.end(), i) != intersection_mask.end()){
+                pts_cloud.push_back(cloud[i]);
+            }
+           }
+           cout << "Size of cloud after filtering: " << pts_cloud.size() << endl;
+           cloud = pts_cloud;
+           auto xtrack_slice = adapt(track_slice, {track_slice.size()});
+           xtrack_slice = filter(xtrack_slice, track_bool_mask);
+           vector<Point2f> img_points(xtrack_slice.begin(), xtrack_slice.end());
+           Mat rvec, distCoeffs;
+           if(!R.empty()){
+                Rodrigues(R, rvec);
+           }
+           cout << "rvec: " << rvec << endl;
+           cout << "Image points 0: " << img_points[0] << endl;
+           assert(cloud.size() == img_points.size());
+           solvePnP(cloud, img_points, K, distCoeffs, rvec, T, use_extrinsic_guess, method);
+           cout << "rvec after call: " << rvec << endl;
+           Rodrigues(rvec, R);
+           tie(R, T) = invert_reference_frame(R, T);
+           return make_tuple(R, T);
+        }
+    
 
 
 
-        tuple<vector<xarray<double>>, vector<xarray<double>>> five_pt_init(vector<vector<Point2f>> init_tracks, vector<vector<int>> init_masks){
+        xarray<int> get_nan_index_mask(){
+            xarray<bool> nan_bool_mask = get_nan_bool_mask();
+            return filter(arange(cloud.size()), nan_bool_mask);
+        }
+
+        xarray<int> get_not_nan_index_mask(){
+            xarray<bool> not_nan_bool_mask = !get_nan_bool_mask();
+            return filter(arange(cloud.size()), not_nan_bool_mask);
+        }
+
+
+        xarray<bool> get_nan_bool_mask(){
+            vector<bool> nan_bool_mask;
+            for(i = 0; i<cloud.size(); i++){
+                if(isnan(cloud[i].x) || isnan(cloud[i].y) || isnan(cloud[i].z)){
+                    nan_bool_mask.push_back(1);
+                }
+                else{
+                    nan_bool_mask.push_back(0);
+                }
+            }
+            auto xnan_bool_mask = adapt(nan_bool_mask, {nan_bool_mask.size()});
+            return xnan_bool_mask;
+        }
+
+
+        tuple<vector<Mat>, vector<Mat>> five_pt_init(vector<vector<Point2f>> init_tracks, vector<vector<int>> init_masks){
             if(init_tracks.size()>2){
                 init_tracks = vector<vector<Point2f>> (init_tracks.end()-1, init_tracks.end());
                 init_masks = vector<vector<int>> (init_masks.end()-1, init_masks.end());
             }
-            Mat E, five_pt_mask, mask, R2, t2; 
-            xarray<double> R({3,3});
-            xarray<double> T({3,1});
-            //cout << "Dimension OF EMPTY R: " << R.dimension() << endl;
-            //cout << "Dimension OF EMPTY T: " << T.dimension() << endl;
-            //R = eye(3);
-            //T = zeros<double>({3,1});
-            //xarray<xarray<double>> Rs({1}); //this is not correct!!
-            //xarray<xarray<double>> Ts({1});
-            //xarray<xarray<double>> Rs({3,3,1}); //this is not correct!!
-            //xarray<xarray<double>> Ts({3,1,1});
-            //Rs += R;
-            //Ts += T;
-            vector<xarray<double>> Rs = {eye(3)};
-            vector<xarray<double>> Ts = {zeros<double>({3,1})};
+            Mat R, T; 
+            Rs = {Mat::eye(3,3,CV_64F)};
+            Ts = {Mat::zeros(3,1,CV_64F)};
+
             vector<vector<Point2f>> track_pair;
             xarray<int> pair_mask;
             tie(track_pair, pair_mask)  = get_last_track_pair(init_tracks, init_masks);
-            E = findEssentialMat(track_pair[0], track_pair[1], K,  RANSAC, ransac_probability, essential_mat_threshold, five_pt_mask);         //error was here
-            five_pt_mask.copyTo(mask);
-            //cout << "Input mask = " << mask << endl;
-
-            recoverPose(E, track_pair[0], track_pair[1], K, R2, t2, distance_thresh, five_pt_mask);
-
-            //cout << "Output mask = " << five_pt_mask << endl;
-
-
-            cout << "Mat R = " << endl << " " << R2 << endl << endl;
-            cout << "Mat T = " << endl << " " << t2 << endl << endl;
-
-            R = mat_to_xarray(R2);
-            T = mat_to_xarray(t2);
-            cout << "xarray R: " << R << endl;
-            cout << "xarray T: " << T << endl;
-            tie(R, T) = invert_reference_frame(R,T);
-            cout << "Dimension OF FILLED R: " << R.dimension() << endl;
-            cout << "Dimension OF FILLED T: " << T.dimension() << endl;
-            cout << "Dimension of first R: " << Rs[0].dimension() << endl;
-            cout << "Dimension of first T: " << Ts[0].dimension() << endl;
-
-            cout << "Transposed R: " << R << endl;
-            cout << "Linalg T: " << T << endl;
-            assert(Rs.size()-1 ==0);
-            assert(Ts.size()-1 ==0);
-            tie(R, T) = compose_rts(R, T, Rs[0], Ts[0]);
-            //assert(R.dimension()==2 && T.dimension()==2 && Rs(0).dimension()==2 && Ts(0).dimension()==2);
-            vector<Point3f> points3d;
-            if(R.dimension()==2 && T.dimension()==2 && Rs[0].dimension()==2 && Ts[0].dimension()==2){
-                points3d = triangulate(transpose(Rs[0]), -linalg::dot(transpose(Rs[0]), Ts[0]), transpose(R), -linalg::dot(transpose(R),T), track_pair);                                              //reconverting motion matrices to relative frame coordinate system is required by the OpenCV function
+            tie(R, T) = five_pt(track_pair, pair_mask, Rs[0], Ts[0]);
+            if(R.empty()){
+                vector<Mat> null_Rs, null_Ts;
+                return make_tuple(null_Rs, null_Rs);
             }
+            vector<Point3f> points3d;
+            //if(R.dimension()==2 && T.dimension()==2 && Rs[0].dimension()==2 && Ts[0].dimension()==2){
+            //    points3d = triangulate(transpose(Rs[0]), -linalg::dot(transpose(Rs[0]), Ts[0]), transpose(R), -linalg::dot(transpose(R),T), track_pair);                                              //reconverting motion matrices to relative frame coordinate system is required by the OpenCV function
+            //}
+            points3d = triangulate(Rs[0].t(), -(Rs[0].t())*Ts[0], R.t(), -(R.t())*T, track_pair);                                              //reconverting motion matrices to relative frame coordinate system is required by the OpenCV function
             points_to_cloud(points3d, pair_mask); 
             Rs.push_back(R);
             Ts.push_back(T);
             return make_tuple(Rs, Ts);
 
         }
+
+        tuple<Mat, Mat> five_pt(vector<vector<Point2f>> track_pair, xarray<int> pair_mask, Mat prev_R, Mat prev_T){
+            Mat E, five_pt_mask, mask, R, T; 
+            //tie(track_pair, pair_mask)  = get_last_track_pair(init_tracks, init_masks);
+            E = findEssentialMat(track_pair[0], track_pair[1], K,  RANSAC, ransac_probability, essential_mat_threshold, five_pt_mask);         //error was here
+            five_pt_mask.copyTo(mask);
+            //cout << "Input mask = " << mask << endl;
+
+            recoverPose(E, track_pair[0], track_pair[1], K, R, T, distance_thresh, five_pt_mask);
+
+            //cout << "Output mask = " << five_pt_mask << endl;
+
+
+            cout << "Mat R = " << endl << " " << R << endl << endl;
+            cout << "Mat T = " << endl << " " << T << endl << endl;
+            tie(R, T) = invert_reference_frame(R,T);
+            //cout << "Dimension OF FILLED R: " << R.dimension() << endl;
+            //cout << "Dimension OF FILLED T: " << T.dimension() << endl;
+            printf("Filled R dimensions: %s %dx%d \n", type2str( R.type() ).c_str(), R.rows, R.cols );
+            printf("Filled T dimensions: %s %dx%d \n", type2str( T.type() ).c_str(), T.rows, T.cols );
+            printf("Filled R0 dimensions: %s %dx%d \n", type2str( prev_R.type() ).c_str(), prev_R.rows, prev_R.cols );
+            printf("Filled T0 dimensions: %s %dx%d \n", type2str( prev_T.type() ).c_str(), prev_T.rows, prev_T.cols );
+            //cout << "Dimension of first R: " << prev_R.dimension() << endl;
+            //cout << "Dimension of first T: " << prev_T.dimension() << endl;
+
+            cout << "Transposed R: " << R << endl;
+            cout << "Linalg T: " << T << endl;
+            assert(Rs.size()-1 ==0);
+            assert(Ts.size()-1 ==0);
+            tie(R, T) = compose_rts(R, T, prev_R, prev_T);
+            return make_tuple(R,T);
+
+        }
+
 
         void points_to_cloud(vector<Point3f> points3d, xarray<int> pair_mask){
             cout << "Max track_mask: " << amax(pair_mask)() +1 << endl;
@@ -446,20 +556,37 @@ class StructureFromMotion{
             cloud = points_cloud;
         }
 
+        //void add_points_to_cloud(vector<Point3f> points_3d, xarray<int> indexes){
+        //    assert(!cloud.empty());
+        //    xarray<int> cloud_mask = get_not_nan_index_mask(cloud);
+        //    xarray<int> new_points_mask = setdiff1d(indexes, cloud_mask);
+        //                
+        //}
 
-        vector<Point3f> triangulate(xarray<double> R1, xarray<double> T1, xarray<double> R2, xarray<double> T2, vector<vector<Point2f>> track_pair){
+
+        vector<Point3f> triangulate(Mat R1, Mat T1, Mat R2, Mat T2, vector<vector<Point2f>> track_pair){
+            vector<Point3f> points3d;
+            cout << "Test failed? " << endl;
+            if(R1.empty() || T1.empty() || R2.empty() || T2.empty()){
+                return points3d;
+            }
+            cout << "Really? " << endl;
             xarray<double> P1({3,4});
             xarray<double> P2({3,4});
             xarray<double> xK = mat_to_xarray(K);
+            xarray<double> xR1 = mat_to_xarray(R1);
+            xarray<double> xR2 = mat_to_xarray(R2);
+            xarray<double> xT1 = mat_to_xarray(T1);
+            xarray<double> xT2 = mat_to_xarray(T2);
             cout << "K in xarray = " << xK << endl;
-            P1 = linalg::dot(xK, hstack(xtuple(R1, T1)));
-            P2 = linalg::dot(xK, hstack(xtuple(R2, T2)));
-            cout << "R1 = " << R1 << endl;
-            cout << "T1 = " << T1 << endl;
-            cout << "[R1|T1] = " << hstack(xtuple(R1, T1));
-            cout << "R2 = " << R2 << endl;
-            cout << "T2 = " << T2 << endl;
-            cout << "[R2|T2] = " << hstack(xtuple(R2, T2));
+            P1 = linalg::dot(xK, hstack(xtuple(xR1, xT1)));
+            P2 = linalg::dot(xK, hstack(xtuple(xR2, xT2)));
+            cout << "R1 = " << xR1 << endl;
+            cout << "T1 = " << xT1 << endl;
+            cout << "[R1|T1] = " << hstack(xtuple(xR1, xT1));
+            cout << "R2 = " << xR2 << endl;
+            cout << "T2 = " << xT2 << endl;
+            cout << "[R2|T2] = " << hstack(xtuple(xR2, xT2));
             cout << "Proj matrix 1: " << P1 << endl;
             cout << "Proj matrix 2: " << P2 << endl;
             Mat P_1, P_2, points4d;
@@ -493,7 +620,6 @@ class StructureFromMotion{
             cout << "reshaped 3: " << pts4d.at<Vec4f>(0,0)[3] << endl;
 
             //Mat points3d;
-            vector<Point3f> points3d;
             convertPointsFromHomogeneous(pts4d, points3d);
             cout << "First 3d point: " << points3d[0] << endl;
             cout << "(x)" << points3d[0].x << " = " <<  (pts4d.at<Vec4f>(0,0)[0])/(pts4d.at<Vec4f>(0,0)[3]) << "(X/W)?" << endl;
@@ -526,13 +652,16 @@ class StructureFromMotion{
           return r;
         }
 
-
-        tuple<xarray<double>, xarray<double>> invert_reference_frame(xarray<double> R, xarray<double> T){
-            return make_tuple(transpose(R), linalg::dot(transpose(R), -T));                                   //expressing motion matrices between current and previous frame
+        
+        tuple<Mat, Mat> invert_reference_frame(Mat R, Mat T){
+            if(R.empty()){
+                return make_tuple(T, R);
+            }
+            return make_tuple(R.t(), -(R.t())*T);                                   //expressing motion matrices between current and previous frame
         }                                                                                                      // in global (first camera) coordinate system
 
-        tuple<xarray<double>, xarray<double>> compose_rts(xarray<double> R, xarray<double> T, xarray<double> prev_R, xarray<double> prev_T){
-            return make_tuple(linalg::dot(prev_R,R), prev_T + linalg::dot(prev_R, T));                      //(og pipeline: compose_rts - this expresses motion from the current frame in respect to the first)
+        tuple<Mat, Mat> compose_rts(Mat R, Mat T, Mat prev_R, Mat prev_T){
+            return make_tuple(prev_R*R, prev_T + prev_R*T);                      //(og pipeline: compose_rts - this expresses motion from the current frame in respect to the first)
         }
 
         //cv::Mat xarray_to_mat(xt::xarray<double> xarr)
@@ -579,28 +708,41 @@ class StructureFromMotion{
         //    return res;
         //}
 
-
-        tuple<vector<vector<Point2f>>, xarray<int>> get_last_track_pair(vector<vector<Point2f>> init_tracks, vector<vector<int>> init_masks){
-            vector<Point2f> init_track1 = init_tracks[init_tracks.size()-1];
-            vector<Point2f> init_track2 = init_tracks[init_tracks.size()-2];
-            vector<int> init_mask1 = init_masks[init_masks.size()-1];
-            vector<int> init_mask2 = init_masks[init_masks.size()-2];
-            vector<int> pair_mask;
-
-            for(i = 0; i<init_mask1.size(); i++){
-                for(j=0; j<init_mask2.size(); j++){
-                    if(init_mask1[i]==init_mask2[j]){
-                        pair_mask.push_back(init_mask1[i]);
+        xarray<int> get_intersection_mask(vector<int> mask1, vector<int> mask2){
+            vector<int> intersection_mask;
+            for(i = 0; i<mask1.size(); i++){
+                for(j=0; j<mask2.size(); j++){
+                    if(mask1[i]==mask2[j]){          
+                        intersection_mask.push_back(mask1[i]);
                     }
                 }
             }
-            sort(pair_mask.begin(), pair_mask.end());
-            auto xpair_mask = adapt(pair_mask, {pair_mask.size()});
+            sort(intersection_mask.begin(), intersection_mask.end());
+            auto xintersection_mask = adapt(intersection_mask, {intersection_mask.size()});
+            return xintersection_mask;
+        }
+
+
+        tuple<vector<vector<Point2f>>, xarray<int>> get_last_track_pair(vector<vector<Point2f>> init_tracks, vector<vector<int>> init_masks){
+            cout << "Here you must be ** getting " << endl;
+            cout << "Size of init tracks: " << init_tracks.size() << endl;
+            vector<Point2f> init_track1 = init_tracks[init_tracks.size()-1];
+            vector<Point2f> init_track2 = init_tracks[init_tracks.size()-2];
+
+            cout << "Getting here toen? " << endl;
+            vector<int> init_mask1 = init_masks[init_masks.size()-1];
+            vector<int> init_mask2 = init_masks[init_masks.size()-2];
+
+            //auto xpair_mask = get_intersection_mask(init_mask1, init_mask2);
+
+            auto xpair_mask = get_intersection_mask(init_mask2, init_mask1);
+            assert(get_intersection_mask(init_mask1, init_mask2) == get_intersection_mask(init_mask2, init_mask1));
             auto xmask1 = adapt(init_mask1, {init_mask1.size()});
             cout << "mask 1: " << xmask1 << endl;
             auto xmask2 = adapt(init_mask2, {init_mask2.size()});
             cout << "mask 2: " << xmask2 << endl;
             cout << "pair mask: " << xpair_mask << endl;
+
 
             auto xtrack1 = adapt(init_track1, {init_track1.size()});
             //cout << "TRACK 1: " << xtrack1 << endl;
@@ -617,8 +759,8 @@ class StructureFromMotion{
             vector<Point2f> track_pair1(xtrack_pair1.begin(), xtrack_pair1.end());
 
 
-            vector<vector<Point2f>> track_pair{track_pair0, track_pair1};
-
+            //vector<vector<Point2f>> track_pair{track_pair0, track_pair1};
+            vector<vector<Point2f>> track_pair{track_pair1, track_pair0};
             //vector<vector<Point2f>> track_pair;
             //track_pair.push_back(track_pair0);
             //track_pair.push_back(track_pair1);
@@ -627,43 +769,6 @@ class StructureFromMotion{
             return make_tuple(track_pair, xpair_mask);
 
         }
-
-
-
-
-
-
-
-
-
-
-
-
-        //THIS IS FOR ONLINE VISUALIZATION
-        //Mat get_frames(){
-        //    VideoCapture cap(0);
-        //    if(i%(frames_to_ski   p+1) ==0){
-        //            //CV_LOG_INFO(&TAG, "Reading frames");
-        //            //cap.read(frame);
-        //            cap >> frame;
-        //            //imshow("Frame", frame);
-        //            //waitKey(1);
-        //            return frame;
-        //    }
-        //    //i++;
-        //}
-
-        // THIS IS FOR POST VISUALIZATION
-        //Mat get_frames_video(){
-        //    //frame_counter ++;    //needs solving!! counter is NOT working
-        //    if(frame_counter%(frames_to_skip+1) ==0){
-        //            cap >> frame;
-        //            return frame;
-//
-        //    }
-        //}
-
-
 
 
 };

@@ -1,3 +1,0 @@
-/home/mateus/IC/OnlineSfM/first_version/CMakeFiles/first_version.dir
-/home/mateus/IC/OnlineSfM/first_version/CMakeFiles/edit_cache.dir
-/home/mateus/IC/OnlineSfM/first_version/CMakeFiles/rebuild_cache.dir

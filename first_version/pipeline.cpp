@@ -55,12 +55,12 @@ using namespace xt;
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto1.MOV";
 //string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto2.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto3.MOV";    
-string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segundo_quarto.MOV";
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segundo_quarto.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cc.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cd.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/casa_cc.MOV";
 //string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/elef5.MOV";
-//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_short/casa.MOV";
+string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_short/casa.MOV";
 
 
 
@@ -109,7 +109,7 @@ class StructureFromMotion{
         size_t frame_counter = 0;
         size_t i, j;
         size_t initial_counter = 0;
-        const int MAX_COUNT = 300;
+        const int MAX_COUNT = 300;  //og was 300
         //const int MAX_COUNT = 130;
         //const int MAX_COUNT = 100;      //tcc param
         const double closeness_threshold = 15;
@@ -169,7 +169,7 @@ class StructureFromMotion{
                     Rs = init_Rs;
                     Ts = init_Ts;
                     cloud = init_cloud;
-                    create_csv();
+                    create_txt();
                     continue;
                 }
                 
@@ -395,7 +395,7 @@ class StructureFromMotion{
             cout << "prev R: " << prev_R << endl;
             cout << "prev T: " << prev_T << endl;
             //triangulate(prev_R, prev_T, R, T, )
-            vector<Point3f> points_3d = triangulate(prev_R.t(), -(prev_R.t())*prev_T, R.t(), -(R.t())*T, track_pair);           //careful here!! Cv operations wont work with empty matrices
+            vector<Point3f> points_3d = triangulate(prev_R.t(), -(prev_R.t())*prev_T, R.t(), -(R.t())*T, track_pair);           //careful here!! Cv operations won't work with empty matrices
             return make_tuple(R, T, points_3d, pair_mask);  
         }
 
@@ -419,7 +419,7 @@ class StructureFromMotion{
         }
 
         tuple<Mat, Mat> solve_pnp_(vector<Point2f> track_slice, vector<int> track_mask, cv::SolvePnPMethod method, Mat R, Mat T, vector<Point3f> cloud){
-            cout << "Getting here? " << endl;
+           cout << "Getting here? " << endl;
            bool use_extrinsic_guess = (!R.empty() && !T.empty()) ? 1 : 0;
            xarray<int> xcloud_mask = get_not_nan_index_mask(cloud); 
            //cout << "XCLOUD MASK: " << xcloud_mask << endl;
@@ -846,7 +846,7 @@ class StructureFromMotion{
         }
 
 
-        void create_csv(){
+        void create_txt(){
             ofstream fout;
             fout.open("init_cloud.txt");
             fout << "cloud = {";

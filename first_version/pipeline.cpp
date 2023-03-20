@@ -45,22 +45,22 @@ using namespace cv::utils::logging;
 using namespace xt;
 
 
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala1.MOV";
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala2.MOV";
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala3.mov";
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala1.mov";
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala2.MOV";
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala3.MOV";
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala4.MOV";
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto1.MOV";
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto2.MOV";
-//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto3.MOV";    
-//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segundo_quarto.MOV";
-//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cc.MOV";
-//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cd.MOV";
-//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/casa_cc.MOV";
-//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/elef5.MOV";
-string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_short/casa.MOV";
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala1.MOV";     //reproj error: 8 (init failed) (succeeds with 1.5 threshold)
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala2.MOV";     //reproj error: 1.sth (init succeeded)
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeira_sala3.mov";     //reproj error: 0.75 (init succeeded) 
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala1.mov";        //reproj error: 1.22462 (init succeeded)
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala2.MOV";        //reproj error: 1.8061 (init failed) (succeeds with 1.5 threshold)
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala3.MOV";        //reproj eror: 0.556 (init succeeded)
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segunda_sala4.MOV";          //reproj error; 0.563 (init succeeded)
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto1.MOV";         //reproj error: 0.357421 (init succeeded)
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto2.MOV";       //reproj error: 0.426767 (init succeeded)
+//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/primeiro_quarto3.MOV";        //reproj error: 0.270192 (init succeeded)
+//string path_to_vid =  "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/segundo_quarto.MOV";           //reproj error: 0.743292 (init succeeded)
+//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cc.MOV";             //doesnt run
+//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/xadrez_cd.MOV";                   //reproj error: 0.683418 (init succeeded)    
+//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_long/casa_cc.MOV";                         //reproj error: 0.458965 (init suceeded, note: this is not a very good test video )
+//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_medium/elef5.MOV";                     //reproj error: 0.224983 (init succeeded)
+//string path_to_vid = "/home/mateus/IC/tcc_sfm-master_2/tcc_sfm-master/datasets/pasta_short/casa.MOV";                     //reproj error: 2.25629 (init succeeded) (doesnt run till the end - 'pair_mask.size() == amax(pair_mask)() + 1' fails)
 
 
 
@@ -96,8 +96,8 @@ class StructureFromMotion{
         vector<int> frame_numbers, mask;
         int frame_number;
         //vector<xarray<double>> Rs, Ts; 
-        vector<Mat> Rs, Ts;       
-        vector<Point3f> cloud = {};
+        vector<Mat> global_Rs, global_Ts;       
+        vector<Point3f> cloud_3d = {};
         //Matx33f K = {4826.28455, 0.0, 1611.73703,
         //             0.0, 4827.31363, 1330.23261,
         //             0.0, 0.0, 1.0};
@@ -110,7 +110,7 @@ class StructureFromMotion{
         size_t i, j;
         size_t initial_counter = 0;
         const int MAX_COUNT = 300;  //og was 300
-        //const int MAX_COUNT = 130;
+        //const int MAX_COUNT = 200;
         //const int MAX_COUNT = 100;      //tcc param
         const double closeness_threshold = 15;
         //const int min_features = 100;
@@ -119,7 +119,9 @@ class StructureFromMotion{
         bool needToInit = 1;
         //bool first_frame = 1;
         int start_index = 0;
-        float error_threshold  = 50;
+        //float error_threshold = 50;     //empirically best value is ~1.5
+        float error_threshold = 1.5;      //note: this is not an absolute value, sometimes it is impossible to have a so low threshold for a given example
+        //float error_threshold = 8;  
         int init_reconstruction_frames = 5;
         int error_calculation_frames = 5;
         bool is_init = 1;
@@ -133,6 +135,8 @@ class StructureFromMotion{
 
         bool use_five_pt_algorithm = 0;
         bool use_solve_pnp = 1;
+        int dropped_tracks = 0;
+        
 
 
         
@@ -147,7 +151,7 @@ class StructureFromMotion{
             //vector<Mat> Rs, Ts;
             for(;;){
                 frame_counter ++;
-                if(frame_counter%(skip_at_getter+1) !=0){continue;}
+                if(frame_counter%(skip_at_getter+1) !=0){continue;} 
                 tie(frame_number, track, mask) = feature_detector();
                 tracks.push_back(track);                                    //this corresponds to init_reconstruction (before reconstruct) on tcc version
                 masks.push_back(mask);
@@ -156,21 +160,36 @@ class StructureFromMotion{
                     continue;
                 }
                 if(is_init){
+                    cout << "ONCE " << endl;
+                    float error;
                     vector<Point3f> init_cloud = {};
                     vector<Mat> init_Rs, init_Ts;
                     initial_counter = 0;
-                    std::vector<vector<Point2f>> init_tracks = std::vector<vector<Point2f>> (tracks.begin(), tracks.begin()+init_reconstruction_frames);
-                    std::vector<vector<int>> init_masks = std::vector<vector<int>> (masks.begin(), masks.begin()+init_reconstruction_frames);               //remember that here some sort of update mechanism is necessary 
+                    std::vector<vector<Point2f>> init_tracks = std::vector<vector<Point2f>> (tracks.begin() + dropped_tracks, tracks.begin()+init_reconstruction_frames + dropped_tracks);
+                    std::vector<vector<int>> init_masks = std::vector<vector<int>> (masks.begin() + dropped_tracks, masks.begin()+init_reconstruction_frames + dropped_tracks);               //remember that here some sort of update mechanism is necessary 
                     //std::vector<int> init_frame_numbers = std::vector<int> (frame_numbers.begin(), frame_numbers.begin()+init_reconstruction_frames);       //in order to allow the repetition of the init_reconstruction phase. For instance, 
                     assert(init_tracks.size() == init_masks.size());                                                                                        //sth like summing a "dropped_tracks = 1" integer to both ends of the iterator(this variable will depend on the reconstruction error)
-                    cout << "III: " << initial_counter << endl;
+                    assert(init_tracks.size() == 5);
                     tie(init_Rs, init_Ts, init_cloud) = init_reconstruction(init_tracks, init_masks, init_Rs, init_Ts, init_cloud);
-                    is_init = 0;
-                    Rs = init_Rs;
-                    Ts = init_Ts;
-                    cloud = init_cloud;
-                    create_txt();
-                    continue;
+                    //is_init = 0; //is it?
+                    global_Rs = init_Rs;
+                    global_Ts = init_Ts;
+                    cloud_3d = init_cloud;
+                    std::vector<vector<Point2f>> error_calc_tracks = std::vector<vector<Point2f>> (tracks.end() - error_calculation_frames, tracks.end());
+                    std::vector<vector<int>> error_calc_masks = std::vector<vector<int>> (masks.end() - error_calculation_frames, masks.end());               //remember that here some sort of update mechanism is necessary 
+                    std::vector<int> error_calc_frame_numbers = std::vector<int> (frame_numbers.end() - error_calculation_frames, frame_numbers.end());
+                    assert(error_calc_tracks.size() == 5);
+                    if(!cloud_3d.empty()){
+                        error = calculate_init_error(error_calc_tracks, error_calc_masks, error_calc_frame_numbers, cloud_3d);
+                    }
+                    if(error > error_threshold){
+                        dropped_tracks += 1;
+                        continue;
+                    }
+                    else{
+                        is_init = 0;
+                        create_txt();
+                    }
                 }
                 
                 //cout << "Final init phase cloud: " << endl;
@@ -210,7 +229,7 @@ class StructureFromMotion{
 
             else if( !prevGray.empty() ){
                 track_features(mask, image);
-            }
+            }   
 
 
             add(image, mask, tracking_window);
@@ -335,6 +354,88 @@ class StructureFromMotion{
         }
 
 
+        float calculate_init_error(vector<vector<Point2f>> error_calc_tracks, vector<vector<int>> error_calc_masks, vector<int> error_calc_frame_numbers, vector<Point3f> pt_cloud){
+            size_t c;
+            vector<Mat> error_calc_Rs;
+            vector<Mat> error_calc_Ts;
+            Mat R, T, empty_R, empty_T;
+            assert(error_calc_masks.size() == error_calc_tracks.size());
+            assert(error_calc_masks.size() == error_calc_frame_numbers.size());
+            assert(error_calc_frame_numbers.size() == 5);
+            for(c =0; c<error_calc_masks.size(); c++){
+                tie(R, T) = solve_pnp(error_calc_tracks[c], error_calc_masks[c], empty_R, empty_T, pt_cloud);
+                error_calc_Rs.push_back(R);
+                error_calc_Ts.push_back(T);             
+            }
+            return calculate_reconstruction_error(error_calc_Rs, error_calc_Ts, error_calc_tracks, error_calc_masks, error_calc_frame_numbers, pt_cloud);
+        }
+
+        float calculate_reconstruction_error(vector<Mat> ec_Rs, vector<Mat> ec_Ts, vector<vector<Point2f>> ec_tracks, vector<vector<int>> ec_masks, vector<int> ec_frame_numbers, vector<Point3f> pt_cloud){
+            size_t c;
+            Mat R, T, R_cam, r_cam_vec, T_cam, distCoeffs;
+            vector<Point2f> original_track, projected_track;
+            vector<int> track_mask;
+            xarray<int> xtrack_mask;
+            assert(ec_Rs.size() == ec_tracks.size());
+            xarray<int> xcloud_mask = get_not_nan_index_mask(pt_cloud);
+            vector<int> cloud_mask(xcloud_mask.begin(), xcloud_mask.end());
+            vector<float> errors;
+            for(c= 0 ; c< ec_tracks.size(); c++){
+                vector<Point3f> filtered_cloud;
+                R = ec_Rs[c];
+                T = ec_Ts[c];
+                original_track = ec_tracks[c];
+                track_mask = ec_masks[c];
+                xtrack_mask = adapt(track_mask, {track_mask.size()});
+
+
+                xarray<int> intersection_mask = get_intersection_mask(cloud_mask, track_mask);
+                cout << "size of intersct mask" << intersection_mask.size() << endl;
+                cout << "xtrack_mask " << xtrack_mask << endl;
+                auto track_bool_mask = isin(xtrack_mask, intersection_mask);
+                cout << "track bool mask: " << track_bool_mask << endl;
+                tie(R_cam, T_cam) = invert_reference_frame(R, T);
+                Rodrigues(R_cam, r_cam_vec);
+                for(i = 0; i<pt_cloud.size(); i++){
+                    if(std::find(intersection_mask.begin(), intersection_mask.end(), i) != intersection_mask.end()){
+                        filtered_cloud.push_back(pt_cloud[i]);
+                    }
+                }
+                projectPoints(filtered_cloud, r_cam_vec, T_cam, K, distCoeffs, projected_track);
+
+                auto xprojected_pts = adapt(projected_track, {projected_track.size()}); 
+                auto xoriginal_pts = adapt(original_track, {original_track.size()});
+                //cout << "Size of cloud mask: " << cloud_mask.size() << endl;
+                //cout << "Track bool mask: " << track_bool_mask.size() << endl;
+                //cout << filtered_cloud.size() << endl;
+                //cout << "Projected pts (originated from cloud): " << xprojected_pts.size() << endl;
+                assert(intersection_mask.size() == xprojected_pts.size());
+                //cout << "Original pts: " << filter(xoriginal_pts, track_bool_mask) << endl;
+                //cout << "Projected pts: " << xprojected_pts << endl;
+                assert(filter(xoriginal_pts, track_bool_mask).size() == xprojected_pts.size());
+                auto xdelta = filter(xoriginal_pts, track_bool_mask) - xprojected_pts;
+                //cout << "Delta: " << xdelta << endl; 
+                //cout << "Size of delta: " << xdelta.size() << endl;
+                assert(xdelta(0).x == filter(xoriginal_pts, track_bool_mask)(0).x - xprojected_pts(0).x);
+                assert(xdelta(0).y == filter(xoriginal_pts, track_bool_mask)(0).y - xprojected_pts(0).y);
+                //vector<Point2f> delta(xdelta.begin(), xdelta.end());
+                vector<float> errors_per_frame;
+
+                for(i = 0; i< xdelta.size(); i++){
+                    errors_per_frame.push_back(sqrt((xdelta(i).x)*(xdelta(i).x)+(xdelta(i).y)*(xdelta(i).y)));
+                    cout << "Each point distance: " << errors_per_frame[i] << endl;
+                }
+                cout << "Mean each frame" << my_mean(errors_per_frame) << endl;
+                errors.push_back(my_mean(errors_per_frame));
+                //cout << "Errors: " << errors << endl;
+                //cout << "Errors: " << errors.size() << endl;
+            }
+            cout << "Final error: " << my_mean(errors) << endl;
+            return my_mean(errors);
+        }
+
+
+
 
         tuple<vector<Mat>, vector<Mat>, vector<Point3f>> init_reconstruction(vector<vector<Point2f>> init_tracks, vector<vector<int>> init_masks, vector<Mat> Rs, vector<Mat> Ts, vector<Point3f> cloud){
             //vector<Mat> Rs, Ts;
@@ -365,8 +466,7 @@ class StructureFromMotion{
                 cout << "SIZE OF INIT TRACKS 3: " << init_tracks_sliced.size() << endl;
                 tie(R, T, pts_3d, indexes) = calculate_projection(Rs[Rs.size()-1], Ts[Ts.size()-1], init_tracks_sliced, init_masks_sliced, cloud);
                 if(!pts_3d.empty()){
-                    cout << "Entering? " << endl;
-                    add_points_to_cloud(pts_3d, indexes, cloud);
+                    cloud = add_points_to_cloud(pts_3d, indexes, cloud);
                 }
                 Rs.push_back(R);
                 Ts.push_back(T);
@@ -444,7 +544,7 @@ class StructureFromMotion{
             }
            }
            cout << "Size of cloud after filtering: " << pts_cloud.size() << endl;
-           cloud = pts_cloud;
+           //cloud = pts_cloud;
            auto xtrack_slice = adapt(track_slice, {track_slice.size()});
            xtrack_slice = filter(xtrack_slice, track_bool_mask);
            vector<Point2f> img_points(xtrack_slice.begin(), xtrack_slice.end());
@@ -454,8 +554,8 @@ class StructureFromMotion{
            }
            cout << "rvec: " << rvec << endl;
            cout << "Image points 0: " << img_points[0] << endl;
-           assert(cloud.size() == img_points.size());
-           solvePnP(cloud, img_points, K, distCoeffs, rvec, T, use_extrinsic_guess, method);
+           assert(pts_cloud.size() == img_points.size());
+           solvePnP(pts_cloud, img_points, K, distCoeffs, rvec, T, use_extrinsic_guess, method);
            cout << "rvec after call: " << rvec << endl;
            Rodrigues(rvec, R);
            tie(R, T) = invert_reference_frame(R, T);
@@ -508,7 +608,7 @@ class StructureFromMotion{
             tie(R, T) = five_pt(track_pair, pair_mask, Rs[0], Ts[0]);
             if(R.empty()){
                 vector<Mat> null_Rs, null_Ts;
-                return make_tuple(null_Rs, null_Rs, cloud);
+                return make_tuple(null_Rs, null_Ts, cloud);
             }
             vector<Point3f> points3d;
             //if(R.dimension()==2 && T.dimension()==2 && Rs[0].dimension()==2 && Ts[0].dimension()==2){
@@ -591,11 +691,11 @@ class StructureFromMotion{
         }
 
 
-        void add_points_to_cloud(vector<Point3f> points_3d, xarray<int> indexes, vector<Point3f> cloud){
-            assert(!cloud.empty());
-            xarray<int> cloud_mask = get_not_nan_index_mask(cloud);
+        vector<Point3f> add_points_to_cloud(vector<Point3f> points_3d, xarray<int> indexes, vector<Point3f> cloud){   //NOTE: this function only adds new points to the cloud, it does not replace any point that has already been triangulated.
+            assert(!cloud.empty());                                                                        
+            xarray<int> cloud_mask = get_not_nan_index_mask(cloud);                                        
             xarray<int> new_points_mask = setdiff1d(indexes, cloud_mask);
-            xarray<Point3f> xcloud = adapt(cloud, {cloud.size()});
+            xarray<Point3f> xcloud = adapt(cloud, {cloud.size()});                      
             if(amax(indexes)() > cloud.size()){
                 xarray<Point3f> new_cloud = {{0.0,0.0,0.0}};
                 new_cloud.resize({2*amax(indexes)()});
@@ -617,9 +717,9 @@ class StructureFromMotion{
             }    
             cout << "XCLOUD AFTER: " << xcloud << endl;
             cout << "Len xcloud after: " << xcloud.size() << endl;
-            vector<Point3f> points_cloud(xcloud.begin(), xcloud.end());
-            cloud = points_cloud;
-            
+            vector<Point3f> points_cloud(xcloud.begin(), xcloud.end());  
+            //cloud = points_cloud;
+            return points_cloud;
         }
 
         xarray<Point3f> double_filter(xarray<Point3f> first_vec, xarray<Point3f> second_vec, xarray<int> mask1, xarray<int> mask2 = {}){
@@ -786,6 +886,13 @@ class StructureFromMotion{
         //    return res;
         //}
 
+        float my_mean(const std::vector<float>& v)
+        {
+            float sum = std::accumulate(v.begin(), v.end(), 0.0f);
+            return sum / v.size();
+        }
+
+
         xarray<int> get_intersection_mask(vector<int> mask1, vector<int> mask2){
             vector<int> intersection_mask;
             for(i = 0; i<mask1.size(); i++){
@@ -850,15 +957,15 @@ class StructureFromMotion{
             ofstream fout;
             fout.open("init_cloud.txt");
             fout << "cloud = {";
-            for (i = 0; i<cloud.size()-1; i++) {
-                fout << "{" << cloud[i].x << ", " << cloud[i].y <<  ", " << cloud[i].z << "}" << ", ";
+            for (i = 0; i<cloud_3d.size()-1; i++) {
+                fout << "{" << cloud_3d[i].x << ", " << cloud_3d[i].y <<  ", " << cloud_3d[i].z << "}" << ", ";
             }
-            fout << "{" << cloud[cloud.size()-1].x << ", " << cloud[cloud.size()-1].y <<  ", " << cloud[cloud.size()-1].z << "}}" << endl;
+            fout << "{" << cloud_3d[cloud_3d.size()-1].x << ", " << cloud_3d[cloud_3d.size()-1].y <<  ", " << cloud_3d[cloud_3d.size()-1].z << "}}" << endl;
             for (i = 0; i< 5; i++){
-                fout << "{R" << i << ", " << "T" << i << "} = " << "{{{" << Rs[i].at<double>(0, 0) << ", " << Rs[i].at<double>(0, 1) << ", " << Rs[i].at<double>(0, 2) << "}, ";
-                fout << "{" << Rs[i].at<double>(1, 0) << ", " << Rs[i].at<double>(1, 1) << ", " << Rs[i].at<double>(1, 2) << "}, ";
-                fout << "{" << Rs[i].at<double>(2, 0) << ", " << Rs[i].at<double>(2, 1) << ", " << Rs[i].at<double>(2, 2) << "}}";
-                fout << ", {" << Ts[i].at<double>(0, 0) << ", " << Ts[i].at<double>(1, 0) << ", " << Ts[i].at<double>(2, 0) << "}} " << endl;
+                fout << "{R" << i << ", " << "T" << i << "} = " << "{{{" << global_Rs[i].at<double>(0, 0) << ", " << global_Rs[i].at<double>(0, 1) << ", " << global_Rs[i].at<double>(0, 2) << "}, ";
+                fout << "{" << global_Rs[i].at<double>(1, 0) << ", " << global_Rs[i].at<double>(1, 1) << ", " << global_Rs[i].at<double>(1, 2) << "}, ";
+                fout << "{" << global_Rs[i].at<double>(2, 0) << ", " << global_Rs[i].at<double>(2, 1) << ", " << global_Rs[i].at<double>(2, 2) << "}}";
+                fout << ", {" << global_Ts[i].at<double>(0, 0) << ", " << global_Ts[i].at<double>(1, 0) << ", " << global_Ts[i].at<double>(2, 0) << "}} " << endl;
             }
             //fout << "Rs = {{" << 
             fout.close();

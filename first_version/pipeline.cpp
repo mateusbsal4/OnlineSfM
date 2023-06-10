@@ -7,6 +7,7 @@
 #include <opencv2/core/utils/logger.hpp>
 #include <opencv2/core/utils/filesystem.hpp>
 #include <opencv2/calib3d.hpp>
+#include <opencv2/viz.hpp>
 #include "opencv2/video/tracking.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/videoio.hpp"
@@ -42,11 +43,12 @@ using namespace cv::utils::logging;
 using namespace xt;
 
 //THESE CRITERIA ARE SENSITIVE TO CHANGES
-//TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS,20,0.03);
-//Size subPixWinSize(10,10), winSize(31,31);            //example (standard OpenCV) criteria
+//TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS,50,0.01);
+TermCriteria termcrit(TermCriteria::COUNT|TermCriteria::EPS,50,0.01);
+Size subPixWinSize(10,10), winSize(31,31);            //example (standard OpenCV) criteria
 
-TermCriteria termcrit(3,30,0.003);
-Size subPixWinSize(10,10), winSize(15,15);           // tcc criteria
+//TermCriteria termcrit(3,30,0.003);
+//Size subPixWinSize(10,10), winSize(15,15);           // tcc criteria
 
 int initial_indexes_shape = 1;   
 xarray<int> indexes_2d({initial_indexes_shape});
@@ -64,19 +66,19 @@ class StructureFromMotion{
         //vector<xarray<double>> Rs, Ts; 
         vector<Mat> global_Rs, global_Ts;       
         vector<Point3f> cloud_3d = {};
-        //Matx33f K = {4826.28455, 0.0, 1611.73703,
-        //             0.0, 4827.31363, 1330.23261,
-        //             0.0, 0.0, 1.0};
+        Matx33f K_viz = {4826.28455, 0.0, 1611.73703,
+                     0.0, 4827.31363, 1330.23261,
+                     0.0, 0.0, 1.0};
 
         Mat K = (Mat_<double>(3,3) << 4826.28455, 0, 1611.73703, 0, 4827.31363, 1330.23261, 0, 0, 1);
-        const int skip_at_getter = 1; //skip_at_getter in tcc pipeline
-        const int yield_period = 2;
+        const int skip_at_getter = 3; //skip_at_getter in tcc pipeline
+        const int yield_period = 1;
         const LogTag TAG = LogTag("SfM", LOG_LEVEL_DEBUG);
         size_t frame_counter = 0;
         size_t i, j;
         size_t initial_counter = 0;
         //const int MAX_COUNT = 300;  //og was 300
-        const int MAX_COUNT = 200; //for elef5
+        const int MAX_COUNT = 300; //for elef5
         //const int MAX_COUNT = 100;      //tcc param
         //const int MAX_COUNT = 98;
         const double closeness_threshold = 15;
@@ -121,6 +123,15 @@ class StructureFromMotion{
 
 
         int runSfM(VideoCapture cap){
+            viz::Viz3d window("SfM Visualization");
+            window.setWindowSize(Size(2000,2000));
+            //window.setWindowPosition(Point(150,150));
+            //viz::Viz3d myWindow("Coordinate Frame");
+            //window.setWindowSize(Size(1000,1000));
+            //window.setWindowPosition(Point(150,150));
+            //window.setBackgroundColor(); // black by default
+            vector<Affine3d> path;
+            vector<Vec3f> point_cloud_est;
             for(;;){
                 static int frame_number;
                 frame_counter ++;
@@ -151,8 +162,9 @@ class StructureFromMotion{
                     std::vector<vector<int>> error_calc_masks = std::vector<vector<int>> (masks.end() - error_calculation_frames, masks.end());               
                     std::vector<int> error_calc_frame_numbers = std::vector<int> (frame_numbers.end() - error_calculation_frames, frame_numbers.end());
                     assert(error_calc_tracks.size() == 5);
+                    //MEMORY ERROR FOR XADREZ_CC occurs somewhere from this line
                     if(!cloud_3d.empty()){
-                        error = calculate_init_error(error_calc_tracks, error_calc_masks, cloud_3d);
+                        error = calculate_init_error(error_calc_tracks, error_calc_masks, cloud_3d);        //occurs here
                     }
                     if(error > error_threshold){
                         dropped_tracks += 1;
@@ -160,21 +172,39 @@ class StructureFromMotion{
                     }
                     else{
                         is_init = 0;
-                        create_txt("init_cloud.txt", 1);
                     }
+                    //TO this line
                     continue;
+                }
+                
+                viz::WCloud cloud_widget(cloud_3d, viz::Color::white());
+                //Affine3d viewer_pose(Vec3d(0, 0, -1000));
+                //float scale_factor = 2.0; 
+                //cv::Affine3d scale_transform = cv::viz::makeTransformToGlobal(Vec3f(0.0f,-2.0f,0.0f), Vec3f(-2.0f,0.0f,0.0f), Vec3f(0.0f,0.0f,-2.0f));
+                //cloud_widget.setPose(scale_transform * cloud_widget.getPose());
+                cloud_widget.setRenderingProperty(viz::POINT_SIZE, 3.0);
+                window.showWidget("point_cloud", cloud_widget);
+                if(global_Rs.size() > 0){
+                    for(int path_counter = path.size(); path_counter<global_Rs.size(); path_counter ++){
+                        path.push_back(Affine3d(global_Rs[path_counter], global_Ts[path_counter]));
+                    }
+                    window.showWidget("cameras_frames_and_lines", viz::WTrajectory(path, viz::WTrajectory::PATH, 0.1, viz::Color::blue()));
+                    window.showWidget("cameras_frustums", viz::WTrajectoryFrustums(path, K_viz, 0.1, viz::Color::red()));
+                    //window.setViewerPose(viewer_pose);                    
                 }
                 //break;  //testing purpose: init error read
                 vector<vector<Point2f>> remaining_tracks(tracks.end() - error_calculation_frames-1, tracks.end());
                 vector<vector<int>> remaining_masks(masks.end() - error_calculation_frames-1, masks.end());                       
                 vector<int> remaining_frame_numbers(frame_numbers.end()-error_calculation_frames-1, frame_numbers.end()); 
                 
-                tie(global_Rs, global_Ts, cloud_3d) = reconstruct(remaining_tracks, remaining_masks, global_Rs, global_Ts, cloud_3d);           
+                tie(global_Rs, global_Ts, cloud_3d) = reconstruct(remaining_tracks, remaining_masks, global_Rs, global_Ts, cloud_3d); 
+                window.spinOnce(1, true);          
             }
-            create_txt("final_cloud.txt", 2);
+            cout << "Ended " << endl;
+            while(1){window.spinOnce(1, true);}     //keeps the window opened after the pipeline has ended
+            //window.spin();
             return 0;
         }
-
 
 
 
@@ -186,6 +216,7 @@ class StructureFromMotion{
             //cout << "NEW PT INDEXES: " << new_pt_indexes << endl;
             if(!new_pts.empty()){
                 cloud = add_points_to_cloud(new_pts, new_pt_indexes, cloud);
+                //add_points_to_cloud(new_pts, new_pt_indexes, cloud);
             }
             Rs.push_back(R);
             Ts.push_back(T);
@@ -235,7 +266,10 @@ class StructureFromMotion{
             }
             //cout << "INDEXES" << indexes_2d << endl;
             if(frame_counter % yield_period ==0){
-                vector<int> inds(indexes_2d.begin(), indexes_2d.end());
+                //cout << "Last of indexes 2d: " << *indexes_2d.end() << endl;
+                //cout << "Last of indexes 2d: " << *(indexes_2d.begin() + indexes_2d.size()) << endl;      //testing purposes 
+                //if(frame_counter == 20){while(1);}
+                vector<int> inds(indexes_2d.begin(), indexes_2d.end());         //this works
                 return  std::make_tuple(frame_counter, prev_points, inds);
             }
 
@@ -246,6 +280,7 @@ class StructureFromMotion{
         void get_new_features(Mat mask, Mat image){
             //goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.01, 10, Mat(), 3, 3, 0, 0.04);   //example (standard OpenCV) params - block size (3) is too small! This selects too many features
             //cornerSubPix(gray, new_points, subPixWinSize, Size(-1,-1), termcrit);
+            //goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.01, 10, Mat(), 7, 3, 0, 0.04);   
             goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.01, 10, Mat(), 7, 3, 0, 0.04);   
             cornerSubPix(gray, new_points, subPixWinSize, Size(-1,-1), termcrit);
             //goodFeaturesToTrack(gray, new_points, MAX_COUNT, 0.5, 15, Mat(), 11,3, 0, 0.04);    //tcc params
@@ -333,7 +368,16 @@ class StructureFromMotion{
             //auto features = xt::hstack(xtuple(old_features, new_features));
             indexes_2d = xt::hstack(xtuple(indexes_2d, new_indexes));
 
-            vector<Point2f> feats(features.begin(), features.end());
+            vector<Point2f> feats(features.begin(), features.end());            //this IS working
+
+            //cout << "Last theoretical point " << *features.end() << endl;
+            //cout << "Last real point: " << *(features.begin() + features.size()-1) << endl;      //testing purposes 
+            //cout << "Xcloud mask: " << features << endl;
+            //for(int r = 0; r< feats.size(); r++){
+            //    cout << "CLoud mask " << r << ": " << feats[r] << endl;
+            //}
+            //if(frame_counter==40){while(1);}     //testing purposes
+
             points = feats;
 
             assert(points.size() ==indexes_2d.size());
@@ -361,7 +405,8 @@ class StructureFromMotion{
                 error_calc_Rs.push_back(R);
                 error_calc_Ts.push_back(T);             
             }
-            return calculate_reconstruction_error(error_calc_Rs, error_calc_Ts, error_calc_tracks, error_calc_masks, pt_cloud);
+            //return 1.0f;
+            return calculate_reconstruction_error(error_calc_Rs, error_calc_Ts, error_calc_tracks, error_calc_masks, pt_cloud); //xadrez_cc memory leakage occurs here
         }
 
         float calculate_reconstruction_error(vector<Mat> ec_Rs, vector<Mat> ec_Ts, vector<vector<Point2f>> ec_tracks, vector<vector<int>> ec_masks, vector<Point3f> pt_cloud){
@@ -372,7 +417,17 @@ class StructureFromMotion{
             xarray<int> xtrack_mask;
             assert(ec_Rs.size() == ec_tracks.size());
             xarray<int> xcloud_mask = get_not_nan_index_mask(pt_cloud);
-            vector<int> cloud_mask(xcloud_mask.begin(), xcloud_mask.end());
+            vector<int> cloud_mask(xcloud_mask.begin(), xcloud_mask.end());     //this IS working 
+
+            //cout << "Last theoretical point " << *xcloud_mask.end() << endl;
+            //cout << "Last real point: " << *(xcloud_mask.begin() + xcloud_mask.size()-1) << endl;      //testing purposes 
+            //cout << "Xcloud mask: " << xcloud_mask << endl;
+            //for(int m = 0; m< cloud_mask.size(); m++){
+            //    cout << "CLoud mask " << m << ": " << cloud_mask[m] << endl;
+            //}
+            //if(frame_counter==40){while(1);}     //testing purposes
+
+
             vector<float> errors;
             for(c= 0 ; c< ec_tracks.size(); c++){
                 vector<Point3f> filtered_cloud;
@@ -380,12 +435,12 @@ class StructureFromMotion{
                 T = ec_Ts[c];
                 original_track = ec_tracks[c];
                 track_mask = ec_masks[c];
-                xtrack_mask = adapt(track_mask, {track_mask.size()});
+                xtrack_mask = adapt(track_mask, {track_mask.size()});    
 
 
                 xarray<int> intersection_mask = get_intersection_mask(cloud_mask, track_mask);
-                //cout << "size of intersct mask" << intersection_mask.size() << endl;
-                //cout << "xtrack_mask " << xtrack_mask << endl;
+                cout << "size of intersct mask" << intersection_mask.size() << endl;
+                cout << "xtrack_mask " << xtrack_mask << endl;      
                 auto track_bool_mask = isin(xtrack_mask, intersection_mask);
                 //cout << "track bool mask: " << track_bool_mask << endl;
                 tie(R_cam, T_cam) = invert_reference_frame(R, T);
@@ -394,11 +449,10 @@ class StructureFromMotion{
                     if(std::find(intersection_mask.begin(), intersection_mask.end(), i) != intersection_mask.end()){
                         filtered_cloud.push_back(pt_cloud[i]);
                     }
-                }
-                projectPoints(filtered_cloud, r_cam_vec, T_cam, K, distCoeffs, projected_track);
-
+                }   
+                projectPoints(filtered_cloud, r_cam_vec, T_cam, K, distCoeffs, projected_track);    
                 auto xprojected_pts = adapt(projected_track, {projected_track.size()}); 
-                auto xoriginal_pts = adapt(original_track, {original_track.size()});
+                auto xoriginal_pts = adapt(original_track, {original_track.size()});    //all fine til here
                 //cout << "Size of cloud mask: " << cloud_mask.size() << endl;
                 //cout << "Track bool mask: " << track_bool_mask.size() << endl;
                 //cout << filtered_cloud.size() << endl;
@@ -414,13 +468,14 @@ class StructureFromMotion{
                 assert(xdelta(0).y == filter(xoriginal_pts, track_bool_mask)(0).y - xprojected_pts(0).y);
                 //vector<Point2f> delta(xdelta.begin(), xdelta.end());
                 vector<float> errors_per_frame;
-
+//
                 for(i = 0; i< xdelta.size(); i++){
                     errors_per_frame.push_back(sqrt((xdelta(i).x)*(xdelta(i).x)+(xdelta(i).y)*(xdelta(i).y)));
+                    //cout << "errors_per_frame[" << i << "] = " << errors_per_frame[i] << endl;
                 }
                 errors.push_back(my_mean(errors_per_frame));    
             }
-            cout << "Final error: " << my_mean(errors) << endl;
+            //cout << "Final error: " << my_mean(errors) << endl;
             return my_mean(errors);
         }
 
@@ -433,7 +488,7 @@ class StructureFromMotion{
                 vector<vector<Point2f>> init_tracks_sliced  = std::vector<vector<Point2f>> (init_tracks.begin(), init_tracks.begin()+initial_counter+1);                     
                 vector<vector<int>> init_masks_sliced = std::vector<vector<int>> (init_masks.begin(), init_masks.begin()+initial_counter+1);                       
                 if(cloud.empty()){
-                    cout << "Entering" << endl;
+                    //cout << "Entering" << endl;
                     if(init_masks_sliced.size() > 1 && init_tracks_sliced[0].size() >= 5){
                         tie(Rs, Ts, cloud) = five_pt_init(init_tracks_sliced, init_masks_sliced, Rs, Ts, cloud);
                         assert(Rs.size() == 2);
@@ -445,9 +500,11 @@ class StructureFromMotion{
                 tie(R, T, pts_3d, indexes) = calculate_projection(Rs[Rs.size()-1], Ts[Ts.size()-1], init_tracks_sliced, init_masks_sliced, cloud);
                 if(!pts_3d.empty()){
                     cloud = add_points_to_cloud(pts_3d, indexes, cloud); 
+                    //add_points_to_cloud(pts_3d, indexes, cloud); 
                 }
                 Rs.push_back(R);
                 Ts.push_back(T);
+
             }
             return make_tuple(Rs, Ts, cloud);  
         }
@@ -468,10 +525,11 @@ class StructureFromMotion{
             if(use_solve_pnp){
                 tie(R, T) = solve_pnp(tracks[tracks.size()-1], masks[masks.size() -1], R, T, cloud);       
             }
-            //cout << "R 1 " << R << endl;
+            cout << "R 1 " << R << endl;
             //cout << "T 1 " << T << endl;
             //cout << "prev R: " << prev_R << endl;
             //cout << "prev T: " << prev_T << endl;
+            //assert(prev_R.empty() && !prev_T.empty() && !R.empty() && !T.empty());
             vector<Point3f> points_3d = triangulate(prev_R.t(), -(prev_R.t())*prev_T, R.t(), -(R.t())*T, track_pair);           //careful here!! Cv operations won't work with empty matrices
             return make_tuple(R, T, points_3d, pair_mask);  
         }
@@ -490,6 +548,7 @@ class StructureFromMotion{
                 tie(R, T) = solve_pnp_(track, mask, SOLVEPNP_ITERATIVE, R_est, T_est, cloud);
             }
             cout << "R 4: " << R << endl;
+            cout << "T : " << T << endl;
             return make_tuple(R, T);
         }
 
@@ -591,7 +650,6 @@ class StructureFromMotion{
             Rs.push_back(R);
             Ts.push_back(T);
             return make_tuple(Rs, Ts, cloud);
-
         }
 
         tuple<Mat, Mat> five_pt(vector<vector<Point2f>> track_pair, xarray<int> pair_mask, Mat prev_R, Mat prev_T){
@@ -603,60 +661,79 @@ class StructureFromMotion{
             tie(R, T) = invert_reference_frame(R,T);
             tie(R, T) = compose_rts(R, T, prev_R, prev_T);
             return make_tuple(R,T);
-
         }
 
 
         vector<Point3f> points_to_cloud(vector<Point3f> points3d, xarray<int> pair_mask){
             auto points_3d = adapt(points3d, {points3d.size()});
-            xarray<Point3f> xcloud = {{0.0,0.0,0.0}};   //This needs fixing! Needs to be all_nan or a seconda call to add_points_to_cloud wont work
+            xarray<Point3f> xcloud = {{0.0,0.0,0.0}};   
             xcloud.resize({amax(pair_mask)() +1});
             xcloud = all_nan(xcloud);
             xcloud = points_3d;
             assert(xcloud.size() == points_3d.size());
             assert(adapt(xcloud.shape()) == adapt(points_3d.shape()));            
             assert(xcloud.dimension() == points_3d.dimension());
-            vector<Point3f> points_cloud(xcloud.begin(), xcloud.end());
+            vector<Point3f> points_cloud(xcloud.begin(), xcloud.end()); //this WORKS
+
+
+            //cout << "Last theoretical point " << *xcloud.end() << endl;
+            //cout << "Last real point: " << *(xcloud.begin() + xcloud.size()-1) << endl;      //testing purposes 
+            //cout << "Xcloud mask: " << xcloud << endl;
+            //for(int t = 0; t< points_cloud.size(); t++){
+            //    cout << "Points cloud " << t << ": " << points_cloud[t] << endl;
+            //}
+            //if(frame_counter==40){while(1);}     //testing purposes
+
             return points_cloud;
         }
 
-
+        //add_points_to_cloud(vector<Point3f> points_3d, xarray<int> indexes, vector<Point3f> cloud){
         vector<Point3f> add_points_to_cloud(vector<Point3f> points_3d, xarray<int> indexes, vector<Point3f> cloud){   //NOTE: this function only adds new points to the cloud, it does not replace any point that has already been triangulated.
             assert(points_3d.size() == indexes.size());                                                       
             assert(!cloud.empty());                                                                        
-            xarray<int> cloud_mask = get_not_nan_index_mask(cloud);   
-            //cout << "Index mask: " << indexes << endl;     
-            //cout << "Cloud mask: " <<cloud_mask << endl;                               
+            xarray<int> cloud_mask = get_not_nan_index_mask(cloud);                                 
             xarray<int> new_points_mask = setdiff1d(indexes, cloud_mask);
-            //cout << "Size of new pts mask " << new_points_mask.size() << endl;
-            //cout << "Last of POINTS 3D: " << points_3d[223+new_points_mask.size()-1] << endl;  
-            //cout << "New pts mask: " << new_points_mask << endl;
-            xarray<Point3f> xcloud = adapt(cloud, {cloud.size()});    
-            //cout << "XCLOUD BEFORE: " << xcloud << endl;                  
-            if(amax(indexes)() > cloud.size()){
+            //cout << "t3" << endl;
+            cout << "New pts mask: " << new_points_mask << endl;
+            cout << "CLoud mask: " << cloud_mask << endl;
+            cout << "Indexes: " << indexes << endl;            
+            xarray<Point3f> xcloud = adapt(cloud, {cloud.size()}); 
+            cout << "Cloud: " << xcloud << endl;   
+            cout << "Pts 3d: " << endl;
+            for(int i = 0; i < points_3d.size(); i++){
+                cout << points_3d[i] << endl;
+            }
+            //cout << "XCLOUD BEFORE: " << xcloud << endl;             
+            if(amax(indexes)() > cloud.size() -1){
                 xarray<Point3f> new_cloud = {{0.0,0.0,0.0}};   
                 new_cloud.resize({2*amax(indexes)()});
                 new_cloud = all_nan(new_cloud);
-               //filter(new_cloud, cloud_mask) = filter(xcloud, cloud_mask);
                 new_cloud = double_filter(new_cloud, xcloud, cloud_mask);
                 xcloud.resize({2*amax(indexes)()});
                 xcloud = new_cloud;
                //cout << "AUGMENTED CLOUD:" << xcloud << endl;
-            }
-            //cout << "XCLOUD BEFORE: " << xcloud << endl;
-            //cout << "Len xcloud before: " << xcloud.size() << endl;
+            }   
             if(new_points_mask.size() >= 1){
                 auto xpoints_3d = adapt(points_3d, {points_3d.size()});
                 xarray<Point3f> new_points = filter(xpoints_3d, isin(indexes, new_points_mask));
-                //cout << "Boolean mask: " << isin(indexes, new_points_mask) << endl;
-                //cout << "NEW POINTS MASK: " << new_points_mask;
-                for(i = 0; i< new_points.size(); i++){ 
+                for(int i = 0; i< new_points.size(); i++){                //error is inside this if statement
                     int index = new_points_mask(i);
+                    cout << "Index " << index << endl;  
                     xcloud(index) = new_points(i);
+                    //cout << ""
                 }
-            }    
+            }  
             //cout << "Len xcloud after: " << xcloud.size() << endl;
             vector<Point3f> points_cloud(xcloud.begin(), xcloud.end());  
+
+            cout << "Last theoretical point " << *xcloud.end() << endl;
+            cout << "Last real point: " << *(xcloud.begin() + xcloud.size()-1) << endl;      //testing purposes 
+            //cout << "Xcloud: " << xcloud << endl; 
+            //for(int u = 0; u< points_cloud.size(); u++){
+            //    cout << "Points cloud " << u << ": " << points_cloud[u] << endl;
+            //}
+            //if(frame_counter==40){while(1);}     //testing purposes
+            cout << "Points cloud: " << points_cloud << endl;
             return points_cloud;
         }
 
@@ -782,9 +859,17 @@ class StructureFromMotion{
         }
 
 
-        float my_mean(const std::vector<float>& v)
+        float my_mean(std::vector<float> const& v)
         {
+            if(v.empty()){
+                return 0;
+            }
+            cout << "Input of my_mean (size:) " << v.size() << endl;
+            //cout << "v.begin() " << v.begin() << endl;
+            //cout << "v.begin() " << v.end() << endl;
             float sum = std::accumulate(v.begin(), v.end(), 0.0f);
+            //return sum;
+            cout << "mean: " << sum/v.size() << endl;
             return sum / v.size();
         }
 
@@ -800,6 +885,14 @@ class StructureFromMotion{
             }
             sort(intersection_mask.begin(), intersection_mask.end());
             auto xintersection_mask = adapt(intersection_mask, {intersection_mask.size()});
+
+            //cout << "Last theoretical index " << *intersection_mask.end() << endl;
+            //cout << "Last real index: " << *(intersection_mask.begin() + intersection_mask.size()-1) << endl;      //testing purposes 
+            //cout << "Xintersection mask: " << xintersection_mask << endl; 
+            //for(int v = 0; v< intersection_mask.size(); v++){
+            //    cout << "Intersection mask  " << v << ": " << intersection_mask[v] << endl;
+            //}
+            //if(frame_counter==40){while(1);}     //testing purposes
             return xintersection_mask;
         }
 
@@ -835,38 +928,6 @@ class StructureFromMotion{
 
 
             return make_tuple(track_pair, xpair_mask);
-
-        }
-
-
-        void create_txt(string file_name, int call){
-            ofstream fout;
-            fout.open(file_name);
-            if(call ==1){
-                fout << "initcloud" << video_name << " = {";        
-            }
-            else if(call ==2){
-                fout << "finalcloud" << video_name << " = {";    
-            }
-            for (i = 0; i<cloud_3d.size()-1; i++) {
-                if(!isnan(cloud_3d[i].x) && !isnan(cloud_3d[i].y) && !isnan(cloud_3d[i].z)){         //all points which are non nan
-                //if(abs(cloud_3d[i].x - 1.5) < 15 && abs(cloud_3d[i].y - 2) < 5 && abs(cloud_3d[i].z - 10) < 35){
-                //if((abs(cloud_3d[i].x) < 40) && (abs(cloud_3d[i].y) < 75) && (abs(cloud_3d[i].z) > 50) && (abs(cloud_3d[i].z) < 130)){
-                    fout << "{" << cloud_3d[i].x << ", " << cloud_3d[i].y <<  ", " << cloud_3d[i].z << "}" << ", "; //this condition could be added as a filter when including new points to the cloud
-
-                }                                                                                   
-                //    fout << "{" << cloud_3d[i].x << ", " << cloud_3d[i].y <<  ", " << cloud_3d[i].z << "}" << ", ";
-                //}
-            }
-            fout << "{" << cloud_3d[cloud_3d.size()-1].x << ", " << cloud_3d[cloud_3d.size()-1].y <<  ", " << cloud_3d[cloud_3d.size()-1].z << "}}" << endl;
-            for (i = 0; i< global_Rs.size(); i++){
-                fout << "{R[" << i << "], " << "T[" << i << "]} = " << "{{{" << global_Rs[i].at<double>(0, 0) << ", " << global_Rs[i].at<double>(0, 1) << ", " << global_Rs[i].at<double>(0, 2) << "}, ";
-                fout << "{" << global_Rs[i].at<double>(1, 0) << ", " << global_Rs[i].at<double>(1, 1) << ", " << global_Rs[i].at<double>(1, 2) << "}, ";
-                fout << "{" << global_Rs[i].at<double>(2, 0) << ", " << global_Rs[i].at<double>(2, 1) << ", " << global_Rs[i].at<double>(2, 2) << "}}";
-                fout << ", {" << global_Ts[i].at<double>(0, 0) << ", " << global_Ts[i].at<double>(1, 0) << ", " << global_Ts[i].at<double>(2, 0) << "}} " << endl;
-            }
-            //fout << "Rs = {{" << 
-            fout.close();
 
         }
 
